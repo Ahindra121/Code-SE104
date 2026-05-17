@@ -1,0 +1,981 @@
+--- PAGE 1 ---
+TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN
+KHOA KHOA HỌC MÁY TÍNH
+BÁO CÁO ĐỒ ÁN CUỐI KÌ
+MÔN: NHẬP MÔN CÔNG NGHỆ PHẦN MỀM
+PHÁT TRIỂN NỀN TẢNG CUNG CẤP KHÓA HỌC
+TRỰC TUYẾN
+Giảng viên: Đỗ Văn Tiến
+Mã lớp: SE104.Q28
+Nhóm sinh viên thực hiện:
+Họ và tên MSSV
+Nguyễn Tuấn Kiệt 24520016
+Cao Hoàng Phúc 24520026
+Trần Ngọc Duy 24520401
+Thành phố Hồ Chí Minh, Ngày 5 tháng 5 năm 2026
+
+--- PAGE 2 ---
+Nền tảng cung cấp khóa học trực tuyến
+MỤC LỤC
+1 TỔNG QUAN ĐỀ TÀI 3
+1.1 Giới thiệu đề tài . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+1.2 Mục tiêu đề tài . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+1.3 Phạm vi đề tài . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+2 KHẢO SÁT HIỆN TRẠNG 5
+2.1 Hiện trạng tổ chức . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+2.2 Hiện trạng nghiệp vụ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+2.3 Hiện trạng tin học . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.3.1 Hiện Trạng Phần Cứng: . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.3.2 Hiện Trạng Phần Mềm: . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.3.3 Trình Độ Công Nghệ Và Thông Tin Của Người Dùng: . . . . . . . . . . . . . . . 7
+2.4 Phương pháp khảo sát . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.4.1 Phỏng Vấn . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+2.4.2 Bảng câu hỏi . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+2.4.3 Nghiên cứu tài liệu . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+2.5 Quan sát thực tế . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+2.5.1 Cách Thực Hiện . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+2.5.2 Những Điểm Cần Lưu Ý . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+2.6 Đối thủ cạnh tranh . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+3 XÁC ĐỊNH VÀ THU THẬP YÊU CẦU 11
+3.1 Yêu cầu chức năng . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.1.1 Yêu cầu nghiệp vụ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.1.2 Danh sách biểu mẫu và quy định . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+3.1.3 Bảng trách nhiệm yêu cầu nghiệp vụ . . . . . . . . . . . . . . . . . . . . . . . . . 20
+3.2 Yêu cầu phi chức năng . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+3.2.1 Yêu cầu hiệu quả . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+3.2.2 Yêu cầu tiện dụng . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+3.2.3 Yêu cầu tương thích . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+3.2.4 Yêu cầu tiến hóa . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+3.3 Yêu cầu hệ thống . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+3.3.1 Yêu cầu bảo mật . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+3.3.2 Yêu cầu an toàn . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+3.4 Yêu cầu công nghệ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+4 MÔ HÌNH HÓA YÊU CẦU 26
+4.1 Sơ đồ User Case . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+Trang 1/ 27
+
+--- PAGE 3 ---
+Nền tảng cung cấp khóa học trực tuyến
+5 THIẾT KẾ HỆ THỐNG 27
+6 THIẾT KẾ DỮ LIỆU 27
+7 THIẾT KẾ GIAO DIỆN 27
+8 TỔNG KẾT 27
+Trang 2/ 27
+
+--- PAGE 4 ---
+Nền tảng cung cấp khóa học trực tuyến
+1 TỔNG QUAN ĐỀ TÀI
+1.1 Giới thiệu đề tài
+Trong bối cảnh phát triển và đổi mới của công nghệ nói riêng và toàn thế giới nói chung, đặc biệt là sau đại
+dịch COVID – 19, nhu cầu ứng dụng những thành tựu vượt bậc của ngành công nghệ thông tin vào trong
+các ngành nghề, lĩnh vực khác nhau, đặc biệt trong lĩnh vực giáo dục, đã trở nên cấp thiết hơn bao giờ hết.
+Nhiều quốc gia, tổ chức giáo dục trên khắp thế giới đổ xô đầu tư, nghiên cứu trong công cuộc chuyển đổi
+số cho nền tảng giáo dục. Điều này hiển nhiên kéo theo sự trỗi dậy bùng nổ của các nền tảng cung cấp khóa
+học trực tuyến.
+Hiện nay, nhu cầu học thêm và nghiên cứu những kiến thức, kỹ năng, chứng chỉ mới nhằm phục vụ công
+việc và học tập của một bộ phận không nhỏ học sinh, sinh viên, người lao động đang ngày căng tăng cao, và
+cũng không ít nền tảng cung cấp khóa học trực tuyến đã được phát triển và cập nhật nhằm đáp ứng những
+nhu cầu trên.
+Tuy nhiên, trong quá trinh học tập vẫn phát sinh những vấn đề không mong muốn như chất lượng không
+đồng đều của khóa học, vấn đề về chi phí, sự tương tác với các giảng viên, cũng như làm người học trở nên
+chán nản trong quá trinh học tập. Dù đã có nhưng nền tảng vô cùng quen thuộc với người Việt như Coursera,
+Udemy, edX, nhưng nó vẫn chưa đủ để đáp ứng nhu cầu của mọi đối tượng, đặc biệt là sinh viên.
+Vì vậy, đề tài“Phát Triển Nền Tảng Cung Cấp Khóa Học Trực Tuyến”được thực hiện nhằm cung cấp
+một giải pháp công nghệ cho những người có nhu cầu học thêm các kiến thức, kỹ năng cần thiết, dễ dàng
+tiếp cận hơn với những khóa học chất lượng, hiệu quả, với chi phí hợp lý, phù hợp với người mới, góp phần
+nâng cao chất lượng học tập, làm việc, mở rộng cơ hội tiếp cận tri thức.
+1.2 Mục tiêu đề tài
+Để đáp ứng nhu cầu người sử dụng, nền tảng cần đáp ứng các mục tiêu cốt lõi sau:
++ Xây dựng nền tảng học trực tuyến linh hoạt:
+Phát triển một hệ thống cho phép người dùng truy cập và học tập mọi lúc, mọi nơi thông qua Internet. Điều
+này giúp khắc phục hạn chế về không gian và thời gian của hình thức học truyền thống, đặc biệt phù hợp
+với sinh viên và người đi làm.
++ Phát triển hệ thống quản lý khóa học toàn diện:
+Cho phép giảng viên tạo, chỉnh sửa và quản lý nội dung khóa học, đồng thời cho phép người học dễ dàng
+đăng ký, theo dõi tham gia các khóa học, điều này thuận tiện cho cả người dạy và người học.
++ Cung cấp nội dung học tập đa dạng và trực quan:
+Tích hợp nhiều dạng nội dung như video bài giảng, tài liệu, bài tập và bài kiểm tra, flashcard, tăng khả năng
+tiếp thu kiến thức, giúp người học không bị nhàm chán và nâng cao hiệu quả học tập.
++ Hỗ trợ theo dõi và đánh giá quá trình học tập:
+Xây dựng chức năng theo dõi tiến độ học tập theo từng khóa học, đồng thời cung cấp các bài kiểm tra, đánh
+giá định kỳ và cuối khóa. Người học có thể tự đánh giá năng lực, đồng thời giúp hệ thống đưa ra phản hồi
+Trang 3/ 27
+
+--- PAGE 5 ---
+Nền tảng cung cấp khóa học trực tuyến
+phù hợp.
++ Tích hợp cá nhân hóa trải nghiệm học tập:
+Ứng dụng công nghệ để gợi ý khóa học phù hợp với nhu cầu và trình độ của người học, tiết kiệm thời gian
+và nâng cao hiệu quả học.
++ Tối ưu chi phí và tăng khả năng tiếp cận:
+Xây dựng nền tảng với chi phí hợp lý, phù hợp với sinh viên và người có thu nhập thấp, mở rộng cơ hội tiếp
+cận tri thức cho nhiều đối tượng khác nhau.
++ Tăng cường tương tác trong học tập:
+Hỗ trợ các chức năng như bình luận, thảo luận hoặc hỏi đáp giữa người học và giảng viên, giảm cảm giác
+“học một mình” khi học online.
++ Xây dựng hệ thống đánh giá và phản hồi khóa học:
+Cho phép người học đánh giá khóa học thông qua số sao, nhận xét và góp ý sau khi hoàn thành, từ đó có thể
+phân loại, sắp xếp các khóa học sao cho người dùng có thể lựa chọn khóa học phù hợp và chất lượng nhất,
+cũng như hỗ trợ giảng viên cải thiện nội dung dựa trên phản hồi thực tế từ người học.
++ Ứng dụng trí tuệ nhân tạo (AI):
+Sử dụng AI để phân tích nhu cầu và hành vi học tập của người dùng, từ đấy gợi ý lộ trình học tập cá nhân
+hóa và đề xuất khóa học phù hợp dựa trên lịch sử học và trình độ của người học. Ngoài ra có thể tích hợp
+chatbot AI để giải đáp thắc mắc và hỗ trợ học tập 24/7
+1.3 Phạm vi đề tài
+Phạm vi của nền tảng trên sẽ tập trung vào các chức năng chính yếu đối với một nền tảng cung cấp khóa
+học trực tuyến, với các chức năng chính cần được quản lý được phát triển và bàn giao theo các module như
+sau:
++ Phạm vi chức năng:
+Hệ thống hỗ trợ đăng ký tài khoản, đăng nhập, tạo lập và tham gia khóa học, xem nội dung bài giảng, làm
+bài kiểm tra, theo dõi tiến độ và đánh giá chất lượng khóa học.
++ Phạm vi người dùng và phân quyền:
+Nền tảng đang hướng tới việc quản lý hai đối tượng chính: Giảng viên (người tạo lập khóa học), Học viên
+(sinh viên, người đi làm, những người có nhu cầu học thêm kiến thức)
++ Phạm vi nội dung:
+Quản lý danh sách bao gồm các khóa học thuộc nhiều lĩnh vực khác nhau (công nghệ, kỹ năng mềm, ngoại
+ngữ, . . . ) nhưng chỉ ở mức cơ bản đến trung bình khá.
++ Phạm vi công nghệ:
+Tập trung phát triển các chức năng cốt lõi, có thể tích hợp AI ở mức đề xuất khóa học và hỗ trợ người dùng,
+chưa đi sâu vào các công nghệ phức tạp như VR/AR.
++ Giới hạn của đề tài:
+Trang 4/ 27
+
+--- PAGE 6 ---
+Nền tảng cung cấp khóa học trực tuyến
+Đề tài chưa triển khai quy mô lớn hoặc thương mại hóa, chưa tích hợp đầy đủ các hệ thống thanh toán và
+bảo mật nâng cao.
+2 KHẢO SÁT HIỆN TRẠNG
+2.1 Hiện trạng tổ chức
+Hiện tại, hệ thống các nền tảng cung cấp khóa học trực tuyến hoạt động dựa trên ba bộ phận cốt lõi: bộ phận
+quản lý nền tảng (Quản trị viên hệ thống), Bộ phận cung cấp nội dung - dịch vụ (Giảng viên, Đối tác), và
+người dùng (Người học) mỗi bộ phận đều có vai trò cụ thể trong việc vận hành và phát triển nền tảng, giúp
+việc học tập trở nên hiệu quả:
+- Bộ phận Quản lý nền tảng (Quản trị viên hệ thống):Chịu trách nhiệm giam sát, quản lý toàn bộ hệ
+thống, bao gồm kiểm duyệt nội dung khoa học, quản lý người dùng, theo dõi dữ liệu học tập, hỗ trợ tiếp
+nhận những ý kiến, những vấn đề mang tính đến kỹ thuật góp phần định hướng phát triển hệ thống, đảm
+bảo an toàn bảo mật và triển khai các chính sách nhằm nâng cao chất lượng đào tạo.
+- Bộ phận Cung cấp nội dung – dịch vụ (Giảng viên, Đối tác):Đảm nhiệm việc xây dựng, cập nhật và
+quản lý nội dung khóa học như video bài giảng, tài liệu, bài tập, flashcard, và bài kiểm tra. Đồng thời, họ
+cũng hỗ trợ giải đáp thắc mắc, hướng dẫn người học và cải thiện chất lượng khóa học dựa trên phản hồi từ
+người dùng.
+- Bộ phận Người dùng (Người học):bao gồm sinh viên và những người có nhu cầu học tập trực tuyến.
+Người học tham gia đăng ký khoa học, theo dõi khoa học, làm bài kiểm tra, đánh giá khóa học và tương tác
+với giảng viên hay cộng đồng học tập. họ chính là nền tảng trung tâm của hệ thống và góp phần cải thiện
+chất lượng nền tảng thông qua những đóng góp, phản hồi, và đánh giá công tâm của họ.
+2.2 Hiện trạng nghiệp vụ
+Hiện tại, các nền tảng cung cấp khóa học trực tuyến được xây dựng nhằm hỗ trợ quá trình dạy và học thông
+qua Internet. Các nghiệp vụ chính của hệ thống tập trung vào việc quản lý người dùng, nội dung học tập,
+quá trình học và đánh giá kết quả. Tuy nhiên, trong quá trình vận hành, vẫn tồn tại nhiều hạn chế cần được
+cải thiện.
+1. Quản lý người dùng:
+- Người dùng đăng ký và sử dụng tài khoản để tham gia học tập, tuy nhiên việc xác thực danh tính và - phân
+loại người dùng chưa thật sự chặt chẽ.
+- Hồ sơ học tập (kỹ năng, tiến độ, mục tiêu) chưa được cập nhật đầy đủ hoặc chưa chính xác.
+- Việc theo dõi hoạt động học tập chưa tối ưu, dẫn đến thiếu dữ liệu hoặc sai lệch thông tin.
+2. Quản lý khoa học và nội dung:
+- Nội dung khóa học được cung cấp dưới dạng video, tài liệu, bài tập nhưng chưa đồng đều về chất
+lượng.
+- Một số khóa học chưa được cập nhật thường xuyên, dẫn đến lỗi thời.
+Trang 5/ 27
+
+--- PAGE 7 ---
+Nền tảng cung cấp khóa học trực tuyến
+- Chưa có hệ thống phân loại và gợi ý nội dung hiệu quả cho từng người học.
+3. Quản lý tương tác và học tập:
+- Tương tác giữa người học và giảng viên còn hạn chế, chủ yếu thông qua bình luận hoặc diễn đàn.
+- Khó theo dõi và tổng hợp hoạt động học tập của người dùng theo thời gian thực.
+- Thiếu môi trường học tập nhóm hoặc tương tác trực tiếp (realtime), làm giảm hiệu quả học tập.
+4. Quản lý động lực học tập:
+- Một số nền tảng có áp dụng hệ thống điểm, chứng chỉ nhưng chưa thực sự tạo động lực lâu dài.
+- Việc ghi nhận và thống kê hoạt động học tập chưa tối ưu, dễ gây nhàm chán cho người học.
+- Chưa có hệ thống đề xuất hoặc nhắc nhở học tập thông minh.
+5. Quản lý đanh giá và báo cáo:
+- Hệ thống có hỗ trợ kiểm tra và chấm điểm, nhưng việc phân tích dữ liệu học tập còn hạn chế.
+- Báo cáo chưa trực quan, khó đánh giá chính xác hiệu quả học tập.
+- Chưa tận dụng tốt dữ liệu để cải thiện nội dung và trải nghiệm người dùng.
+6. Thời gian và không gian học tập:
+- Người học có thể truy cập linh hoạt, tuy nhiên vẫn phụ thuộc vào Internet và thiết bị.
+- Một số khu vực có hạ tầng mạng yếu gặp khó khăn trong việc học trực tuyến.
+- Thiếu môi trường học tập đồng bộ theo thời gian thực, làm giảm sự gắn kết.
+7. Đánh giá nghiệp vụ:
+Ưu Điểm:
+- Linh hoạt về thời gian và địa điểm học tập.
+- Nội dung phong phú, đa dạng lĩnh vực.
+- Một số quy trình đã được tự động hóa, giảm công sức quản lý.
+Nhược Điểm:
+- Thiếu tương tác và trải nghiệm học tập chưa cao.
+- Chất lượng nội dung không đồng đều.
+- Chưa cá nhân hóa lộ trình học tập.
+- Khó duy trì động lực học lâu dài.
+- Chưa tận dụng tốt dữ liệu để cải thiện hệ thống.
+ĐỀ XUẤT:
+- Xây dựng nền tảng học trực tuyến tích hợp đầy đủ các chức năng quản lý, tương tác và đánh giá.
+- Ứng dụng AI để tiến hành cá nhân hóa nội dung và lộ trình học tập.
+- Tăng cường các tính năng tương tác realtime như học nhóm, gọi video, chia sẻ màn hình. Đồng thời phát
+triển hệ thống gamification hiệu quả nhằm nâng cao động lực học tập.
+Trang 6/ 27
+
+--- PAGE 8 ---
+Nền tảng cung cấp khóa học trực tuyến
+- Tối ưu hệ thống phân tích dữ liệu để cải thiện chất lượng nội dung và trải nghiệm người dùng.
+2.3 Hiện trạng tin học
+2.3.1 Hiện Trạng Phần Cứng:
+Hiện nay, các nền tảng cung cấp khóa học trực tuyến đã sử dụng những hệ thống máy chủ hiện đại như cloud
+server hoặc server tập trung nhằm lưu trữ dữ liệu người dùng, tiến trình học tập, quản lý hệ thống khóa học
+một cách hiệu quả. Tuy nhiên, trong một số trường hợp, việc phân bố tài nguyên vẫn chưa tối ưu dẫn đến
+tình trạng quá tải khi có quá nhiều người dùng truy cập cùng lúc. Ngoài ra, việc cho phép nhiều thiết bị truy
+cập vào một tài khoản học tập khiến nền tảng phụ thuộc nhiều vào hệ thống Internet. Điều này ảnh hưởng
+rất lớn đến trải nghiệm và động lực học tập của người học, đặc biệt ở những nơi có hệ thống Internet còn
+hạn chế.
+2.3.2 Hiện Trạng Phần Mềm:
+Phần lớn các nền tảng học tập trực tuyến được xây dựng dựa trên nền tảng web và mobile app, tích hợp nhiều
+tính năng như quản lý tài khoản, khoa học, nội dung học tập và đánh giá kết quả. Các hệ thống này dựa trên
+mô hình quản lý học tập (LMS), giúp tự động hóa nhiều quy trinh thay vì xử lý thủ công. Tuy nhiên, vẫn
+tồn tại rất nhiều hạn chế như giao diện không thân thiện với người dùng, thiếu tinh cá nhân hóa, khả năng
+tương tác giữa học viên và giảng viên chưa được tối ưu. Ngoài ra, một số nền tảng vẫn chưa tích hợp đầy đủ
+những công nghệ mới như AI hoặc hệ thống phân tích dữ liệu tổng hợp, gây ra một số vấn đề không đáng
+có cho người sử dụng.
+2.3.3 Trình Độ Công Nghệ Và Thông Tin Của Người Dùng:
+Nhìn chung, đa phần sinh viên có thể sử dụng những thiết bị cơ bản, nhưng một bộ phận không nhỏ sinh
+viên truyền thống, hay người lao động thường không được đào tạo cơ bản về công nghệ thông tin, dẫn đến
+những hạn chế về khả năng tiếp cận, cũng như trình độ khai thác hiệu quả các hệ thống học tập trực tuyến.
+Nhiều người vẫn chưa quen với việc xây dụng lộ trình học tập, quản lý tiến độ hay sử dụng các chức năng
+nâng cao của nền tảng. Bên cạnh đó, khả năng tiếp thu, tự học và duy trì động lực học tập của nhiều người
+dùng vẫn chưa thật sự tốt, điều này tạo ra một vấn đề không nhỏ cho sự phát triển của nền tảng. Dù vậy,
+nếu được hướng dẫn và hỗ trợ phù hợp, người dùng có thể nhanh chông thích nghi và sử dụng hiệu quả hệ
+thống.
+2.4 Phương pháp khảo sát
+2.4.1 Phỏng Vấn
+Các câu hỏi phỏng vấn:
+Quản lý người dùng:
+- Bạn có gặp khó khăn khi đăng ký, đăng nhập hoặc quản lý tài khoản trên các nền tảng học trực tuyến
+không? Nếu có, bạn mong muốn cải thiện như thế nào?
+Trang 7/ 27
+
+--- PAGE 9 ---
+Nền tảng cung cấp khóa học trực tuyến
+- Bạn có thường xuyên theo dõi tiến độ học tập của mình không? Bạn mong muốn hệ thống hỗ trợ như thế
+nào?
+Quản lý khoa học và nội dung:
+- Bạn có cảm thấy nội dung khóa học phù hợp với trình độ của mình không?
+- Bạn mong muốn nền tảng cải thiện điều gì về chất lượng hoặc cách trình bày nội dung?
+Quản lý tương tác:
+- Bạn có thường xuyên trao đổi với giảng viên hoặc người học khác không?
+- Bạn mong muốn có thêm những tính năng tương tác nào (chat, video call, học nhóm,...)?
+Quản lý động lực học tập:
+- Bạn đã từng bỏ dở khóa học chưa? Nếu có, lý do là gì?
+- Bạn có mong muốn hệ thống nhắc nhở hoặc gợi ý học tập không?
+Các đối tượng phỏng vấn:
+- Sinh viên đang sử dụng các nền tảng học trực tuyến.
+- Giảng viên hoặc người tạo khóa học.
+- Người có kinh nghiệm trong lĩnh vực e-learning.
+2.4.2 Bảng câu hỏi
+Mục tiêu: Thu thập ý kiến từ số lượng lớn người dùng về thói quen học tập và nhu cầu sử dụng nền
+tảng.
+Phương pháp:
+- Khảo sát trực tiếp tại trường học, nơi công cộng.
+- Khảo sát online qua Google Forms, Facebook, Zalo.
+Cấu trúc câu hỏi:
+- Câu hỏi đóng: Xác định tần suất sử dụng, mức độ hài lòng.
+- Câu hỏi mở: Thu thập ý kiến chi tiết.
+- Câu hỏi dò: Làm rõ nhu cầu và mong muốn thực tế.
+2.4.3 Nghiên cứu tài liệu
+Mục tiêu: Tìm hiểu các mô hình và xu hướng phát triển của nền tảng học trực tuyến.
+Nguồn tài liệu nghiên cứu:
+- Các mô hình hệ thống học trực tuyến (LMS).
+- Báo cáo về xu hướng e-learning và hành vi người học.
+Cách thực hiện:
+- Phân tích các nền tảng hiện có.
+Trang 8/ 27
+
+--- PAGE 10 ---
+Nền tảng cung cấp khóa học trực tuyến
+- So sánh ưu và nhược điểm của từng hệ thống.
+- Tham khảo ý kiến chuyên gia trong lĩnh vực công nghệ và giáo dục.
+2.5 Quan sát thực tế
+Mục tiêu chính: Xác định những vấn đề phát sinh trong quá trình sử dụng nền tảng học trực tuyến và trải
+nghiệm thực tế của người học.
+Chủ đề Câu Hỏi Ghi Nhận
+Chủ Đề 1: Trải nghiệm
+học Tập- Khi tham gia các nền tảng học trực tuyến (như
+Coursera, Udemy, YouTube), bạn có gặp khó khăn
+trong việc theo dõi nội dung không? (Có/Không)
+- Bạn có cảm thấy nội dung học dễ hiểu và phù hợp
+với trình độ của mình không?
+- Bạn có từng bỏ dở khóa học giữa chừng không? Nếu
+có, lý do là gì?
+Chủ Đề 2: Nội dung và
+chất lượng khoa học- Bạn đánh giá chất lượng khóa học trên các nền tảng
+hiện tại như thế nào?
+- Nội dung có được cập nhật thường xuyên không?
+(Có/Không)
+- Bạn mong muốn cải thiện điều gì về nội dung học
+tập?
+Chủ Đề 3: Tương tác và
+hỗ trợ học tập- Bạn có thường xuyên tương tác với giảng viên hoặc
+người học khác không? (Có/Không)
+- Bạn có gặp khó khăn khi cần hỗ trợ trong quá trình
+học không?
+- Bạn mong muốn có thêm những tính năng tương tác
+nào (chat, video call, học nhóm,...)?
+Chủ Đề 4: Động lực và
+trải nghiệm người dùng- Bạn có cảm thấy hứng thú khi học trên nền tảng
+không?
+- Những yếu tố nào khiến bạn tiếp tục hoặc bỏ dở khóa
+học?
+- Bạn có mong muốn hệ thống gợi ý khóa học phù hợp
+với mình không?
+Bảng 1: Bảng câu hỏi khảo sát:
+2.5.1 Cách Thực Hiện
+- Quan sát trực tiếp cách sinh viên sử dụng các nền tảng học trực tuyến.
+- Ghi nhận thời gian học, mức độ hoàn thành khóa học và hành vi khi gặp khó khăn.
+- Theo dõi cách người học tương tác với nội dung, giảng viên và hệ thống.
+- Kiểm tra cách nền tảng hiển thị nội dung, quản lý tiến độ và hỗ trợ người dùng.
+Trang 9/ 27
+
+--- PAGE 11 ---
+Nền tảng cung cấp khóa học trực tuyến
+2.5.2 Những Điểm Cần Lưu Ý
+- Thời gian trung bình người học duy trì việc học trên nền tảng.
+- Tỷ lệ hoàn thành khóa học và nguyên nhân bỏ dở.
+- Mức độ tương tác giữa người học và giảng viên.
+- Mức độ phù hợp của nội dung với nhu cầu người học.
+- Trải nghiệm người dùng khi sử dụng hệ thống (giao diện, tốc độ, tính tiện lợi).
+2.6 Đối thủ cạnh tranh
+Mặc dù thị trường hiện nay đã có nhiều nền tảng cung cấp khóa học trực tuyến, nhưng hầu hết vẫn tồn tại
+những hạn chế nhất định, chưa đáp ứng đầy đủ nhu cầu học tập thực tế của người dùng, đặc biệt là sinh viên.
+Bảng dưới đây tổng hợp các thiếu sót chính của những giải pháp hiện hành.
+Tóm lại, các nền tảng hiện tại vẫn chưa đáp ứng đồng thời các nhu cầu cốt lõi của người học:
++ Nội dung học tập chất lượng cao, được kiểm duyệt nhưng vẫn phù hợp với chi phí của sinh viên.
++ Môi trường học tập có tính tương tác cao, hỗ trợ trao đổi trực tiếp giữa người học và giảng viên hoặc cộng
+đồng.
++ Hệ thống cá nhân hóa hiệu quả, giúp định hướng lộ trình học tập và duy trì động lực học lâu dài.
+Nền Tảng Hạn Chế Chính
+Coursera Chi phí chứng chỉ và khóa học cao; tương tác trực tiếp với giảng viên còn hạn chế;
+một số khóa học chưa cập nhật thường xuyên.
+Udemy Chất lượng khóa học không đồng đều do phụ thuộc vào giảng viên; thiếu hệ thống
+kiểm duyệt chặt chẽ; giá trị chứng chỉ chưa cao.
+edX Nội dung mang tính học thuật cao, khó tiếp cận với người mới; ít linh hoạt hơn; chi
+phí một số chương trình khá cao.
+Kyna / Unica Nội dung còn hạn chế về chiều sâu; hệ thống công nghệ và trải nghiệm người dùng
+chưa tối ưu; thiếu tính cá nhân hóa.
+YouTube Nội dung phong phú nhưng không có lộ trình học rõ ràng; thiếu hệ thống đánh giá
+và theo dõi tiến độ; khó đảm bảo chất lượng.
+Bảng 2: So sánh hạn chế của các nền tảng hiện có:
+Những hạn chế trên đã tạo ra nhu cầu phát triển một nền tảng học trực tuyến mới, có khả năng kết hợp giữa
+nội dung chất lượng, chi phí hợp lý, tính tương tác cao và cá nhân hóa trải nghiệm học tập, nhằm nâng cao
+hiệu quả học tập và đáp ứng tốt hơn nhu cầu của người dùng.
+Trang 10/ 27
+
+--- PAGE 12 ---
+Nền tảng cung cấp khóa học trực tuyến
+3 XÁC ĐỊNH VÀ THU THẬP YÊU CẦU
+3.1 Yêu cầu chức năng
+3.1.1 Yêu cầu nghiệp vụ
+Bảng yêu cầu nghiệp vụ
+STT Nghiệp vụ Thao tác cụ thể Biểu mẫu Quy định Ghi chú
+1
+Quản lý
+hệ thốngĐăng ký tài khoản BM 1.1 QĐ 1.1 Lưu trữ
+2 Đăng nhập hệ thống BM 1.2 QĐ 1.2
+3 Cập nhật thông tin tài khoản BM 1.3 QĐ 1.3 Lưu trữ
+4 Khóa/Vô hiệu hóa tài khoản BM 1.4 QĐ 1.4 Lưu trữ
+5
+Quản lý
+khóa họcTạo khóa học mới BM 2.1 QĐ 2.1 Lưu trữ
+6 Cập nhật thông tin khóa học BM 2.2 QĐ 2.2 Lưu trữ
+7 Xóa/Ẩn khóa học BM 2.3 QĐ 2.3 Lưu trữ
+8 Phê duyệt nội dung BM 2.4 QĐ 2.4
+9
+Quản lý
+nội dungThêm bài giảng BM 3.1 QĐ 3.1 Lưu trữ
+10 Cập nhật bài giảng BM 3.2 QĐ 3.2 Lưu trữ
+11 Xóa/Ẩn bài giảng BM 3.3 QĐ 3.3 Lưu trữ
+12 Thêm câu hỏi bài tập BM 3.4 QĐ 3.4 Lưu trữ
+13 Cập nhật công hỏi bài tập BM 3.5 QĐ 3.5 Lưu trữ
+14 Xóa/Ẩn câu hỏi bài tập BM 3.6 QĐ 3.6 Lưu trữ
+15
+Quản lý
+học tậpTra cứu và tìm kiếm khóa học BM 4.1 QĐ 4.1 Tra cứu
+16 Đăng ký tham gia học BM 4.2 QĐ 4.2 Lưu trữ
+17 Theo dõi tiến độ học tập BM 4.3 QĐ 4.3
+18 Thi &
+Đánh giáThực hiện bài kiểm tra BM 5.1 QĐ 5.1
+19 Đánh giá kết quả BM 5.2 QĐ 5.2 Tính toán
+20Báo cáoXuất chứng chỉ BM 6 QĐ 7 Kết xuất
+21 Thống kê BM 6 QĐ 6 Kết xuất
+3.1.2 Danh sách biểu mẫu và quy định
+Để làm rõ các yêu cầu nghiệp vụ đã liệt kê, nhóm tiến hành đặc tả các Biểu mẫu (BM) nhập liệu chính và
+các Quy định (QĐ) nghiệp vụ ràng buộc đi kèm
+*Biểu mẫu 1.1
+Biểu mẫu này dành cho người dùng tạo tài khoản mới
+Trang 11/ 27
+
+--- PAGE 13 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Họ và tên Chuỗi
+2 Số điện thoại Chuỗi(10)
+3 Email Chuỗi
+4 Tên tài khoản Chuỗi Dùng để đăng nhập vào hệ thống.
+5 Mật khẩu Chuỗi Mật khẩu để đăng nhập.
+6 Xác nhận mật khẩu Chuỗi Trùng với mật khẩu.
+7 Vai trò Danh sách chọn Học viên hoặc Giảng viên.
+*Quy định 1.1
+Ràng buộc đăng ký tài khoản:
+•Họ và tên không chứa ký tự đặc biệt/số.
+•Email dùng để đăng nhập không được trùng lặp (Hệ thống phải kiểm tra tính duy nhất khi tạo mới).
+•Tên tài khoản phải có ít nhất 6 ký tự chỉ có thể bao gồm chữ cái, chữ số và dấu (_), đồng thời phải
+đảm bảo tính duy nhất.
+•Mật khẩu phải có ít nhất 8 ký tự, bao gồm ít nhất một chữ cái hoa, một chữ cái thường và một chữ số
+*Biểu mẫu 1.2
+Đăng nhập hệ thống
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Tên tài khoản Chuỗi Phải là tài khoản đã đăng ký.
+2 Mật khẩu Chuỗi Khớp với mật khẩu trong hệ thống.
+*Quy định 1.2
+Ràng buộc khi đăng nhập vào hệ thống
+•Tài khoản đăng nhập phải tồn tại và mật khẩu phải khớp với thông tin tài khoản tương ứng.
+•Nếu thông tin không chính xác, hệ thống phải hiển thị thông báo lỗi và yêu cầu nhập lại. Cho phép
+người dùng sử dụng chức năng ’Quên mật khẩu’ (nếu có).
+*Biểu mẫu 1.3
+Biểu mẫu cho phép người dùng cập nhật thông tin tài khoản.
+Trang 12/ 27
+
+--- PAGE 14 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Họ và tên Chuỗi Cập nhật tên mới (nếu có).
+2 Số điện thoại Chuỗi(10) Phải kiểm tra tính duy nhất.
+3 Email Chuỗi
+4 Mật khẩu hiện tại Chuỗi Ẩn.
+5 Mật khẩu mới Chuỗi Để trống nếu không muốn đổi.
+6 Xác nhận mật khẩu Chuỗi Khớp với mật khẩu mới.
+*Quy định 1.3:
+Ràng buộc khi cập nhật tài khoản:
+•Người dùng phải đang ở trạng thái đăng nhập.
+•Các ràng buộc về định dạng Email và Họ tên áp dụng tương tự QĐ 1.1.
+•Nếu thay đổi email và SĐT, thông tin mới không được trùng với các tài khoản khác trên hệ thống.
+•Để thay đổi thông tin, hệ thống yêu cầu nhập mật khẩu cũ để xác thực danh tính.
+*Biểu mẫu 1.4
+Biểu mẫu dùng để khóa/vô hiệu hóa tài khoản khi người dùng muốn ngừng sử dụng hoặc Admin xử lý vi
+phạm.
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Mã người dùng Chuỗi ID tài khoản cần xử lý.
+2 Lý do khóa Chuỗi Ghi nhận nguyên nhân (vi phạm, yêu cầu cá nhân...).
+3 Mật khẩu xác nhận Chuỗi Để xác nhận quyền chủ sở hữu.
+*Quy định 1.4
+Ràng buộc khi khóa tài khoản:
+•Đối với Người dùng (Tự vô hiệu hóa):
+–Hệ thống chỉ thực hiện khi người dùng nhập đúng mật khẩu xác nhận.
+– Ràng buộc Giảng viên:Không được tự vô hiệu hóa nếu có khóa học ở trạng thái "Công khai".
+Phải chuyển tất cả khóa học sang trạng thái "Lưu trữ"hoặc "Tạm ẩn"trước.
+– Ràng buộc Học viên:Phải hoàn thành hoặc hủy các đăng ký khóa học đang chờ thanh toán
+(nếu có).
+•Đối với Quản trị viên (Khóa cưỡng chế):
+–Admin có quyền khóa bất kỳ tài khoản nào vi phạm chính sách mà không cần sự đồng ý của chủ
+tài khoản.
+–Hệ thống thực hiệnXóa mềm (Soft Delete), chuyển trạng thái hoạt động về "0"để phục vụ truy
+xuất lịch sử báo cáo và giải quyết khiếu nại.
+Trang 13/ 27
+
+--- PAGE 15 ---
+Nền tảng cung cấp khóa học trực tuyến
+*Biểu mẫu 2.1
+Biểu mẫu này dành cho giảng viên tạo khóa học mới
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Tên khóa học Chuỗi
+2 Danh mục Danh sách chọn Lĩnh vực(IT, Ngôn ngữ, Kinh doanh,...)
+3 Mô tả tổng quan Chuỗi Giới thiệu mục tiêu và nội dung khóa học
+4 Học phí Số Giá tiền(VNĐ), để 0 nếu miễn phí
+5 Ảnh đại diện File Thumbnail hiển thị ở trang chủ
+6 Trình độ Danh sách chọn Cơ bản, Trung bình, Nâng cao
+*Quy định 2.1:
+Ràng buộc khi tạo khóa học mới:
+•Chỉ người dùng cóVai trò là Giảng viênvà tài khoản đang hoạt động mới được phép tạo khóa học.
+•Tên khóa học không được trùng lặp với các khóa học hiện có của cùng một Giảng viên.
+•Giá tiền phải là số nguyên dương hoặc bằng 0. Hệ thống không chấp nhận giá trị âm.
+•Trạng thái mặc định sau khi tạo là"Chờ duyệt"(Mã trạng thái = 0). Khóa học chỉ công khai sau khi
+được Admin phê duyệt.
+*Biểu mẫu 2.2
+Biểu mẫu này cho phép Giảng viên thay đổi các thông tin khóa học đã đăng ký.
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Mã khóa học Chuỗi ID định danh duy nhất (Bắt buộc).
+2 Tên khóa học Chuỗi Cho phép thay đổi tên hiển thị.
+3 Mô tả tổng quan Văn bản Cập nhật nội dung giới thiệu khóa học.
+4 Học phí Số Cập nhật giá tiền mới (VND).
+*Quy định 2.2
+Ràng buộc khi giảng viên cập nhật thông tin khóa học:
+•Hệ thống cho phép cập nhật thông tin bất kỳ lúc nào nếu khóa học đang ở trạng thái "Bản nháp".
+•Nếu khóa học đã "Công khai"và có học viên, việc thay đổi Học phí phải tuân theo quy định bảo trì
+giá của hệ thống.
+*Biểu mẫu 2.3
+Biểu mẫu này dùng để xóa hoặc ẩn khóa học
+Trang 14/ 27
+
+--- PAGE 16 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Mã khóa học Chuỗi Xác định khóa học cần xử lý.
+2 Hình thức Danh sách chọn Tạm ẩn / Ngừng cung cấp.
+3 Lý do thực hiện Văn bản Ghi nhận nguyên nhân thay đổi trạng thái.
+*Quy định 2.3
+Ràng buộc khi xóa hoặc ẩn khóa học:
+•Áp dụng cơ chế xóa mềm (Soft Delete), không xóa bản ghi vật lý.
+•Khóa học chỉ được phép ẩn khi đảm bảo quyền lợi truy cập của học viên cũ.
+*Biểu mẫu 2.4
+Biểu mẫu dùng cho việc phê duyệt nội dung của Admin
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Mã yêu cầu Số Định danh lượt phê duyệt nội dung.
+2 Kết quả phê duyệt Danh sách chọn Duyệt / Từ chối yêu cầu.
+3 Phản hồi Văn bản Lý do cụ thể để giảng viên cập nhật lại.
+*Quy định 2.4
+Ràng buộc khi phê duyệt nội dung:
+•Chỉ quản trị viên mới có quyền phê duyệt khóa học sang trạng thái "Công khai".
+•Nội dung phê duyệt đảm bảo minh bạch, tuân thủ tiêu chuẩn học thuật của hệ thống.
+*Biểu mẫu 3.1
+Biểu mẫu dùng để thêm bài giảng
+STT Trường thông tin Kiểu dữ liệu Ghi chú
+1 Mã khóa học Chuỗi Mã khóa học chứa bài giảng.
+2 Tiêu đề bài giảng Chuỗi Tên của chương hoặc bài học.
+3 Tệp tin Video Tệp Video học liệu bài giảng.
+4 Thứ tự hiển thị Số Vị trí bài giảng trong khóa học.
+*Quy định 3.1
+Ràng buộc khi thêm bài giảng:
+•Giảng viên chỉ có thêm thêm vào các khóa học do mình tạo ra.
+•Tệp tin video phải có định dạng .mp4, dung lượng tối đa 500MB.
+•Tiêu đề bài giảng không được bỏ trống và tối đa 200 ký tự.
+Trang 15/ 27
+
+--- PAGE 17 ---
+Nền tảng cung cấp khóa học trực tuyến
+*Biểu mẫu 3.2
+Biểu mẫu dùng để cập nhật bài giảng
+STT Trường thông tin Kiểu dữ liệu Ghi chú
+1 Mã bài giảng Chuỗi Mã định danh bài giảng cần sửa.
+2 Tiêu đề bài giảng Chuỗi Tên của chương hoặc bài học.
+3 Tệp tin Video Tệp Video học liệu bài giảng.
+4 Thứ tự hiển thị Số Vị trí bài giảng trong khóa học.
+*Quy định 3.2
+Ràng buộc khi cập nhật bài giảng
+•Đảm bảo quy định 3.1.
+•Sau khi cập nhật nội dung quan trọng, hệ thống phải gửi thông báo cập nhật đến toàn bộ học viên
+đang theo học khóa học đó.
+*Biểu mẫu 3.3
+Biểu mẫu dùng để xóa/ẩn bài giảng
+STT Trường thông tin Kiểu dữ liệu Ghi chú
+1 Mã bài giảng Chuỗi Xác định bài giảng mục tiêu.
+2 Trạng thái Danh sách Chọn: Đang hiện / Tạm ẩn.
+*Quy định 3.3
+Ràng buộc khi xóa/ẩn bài giảng:
+•Không được phép xóa bài giảng nếu bài giảng đó đang chứa các câu hỏi Quiz mà học viên đã thực
+hiện. Trong trường hợp này, chỉ cho phép sử dụng chức năng "Ẩn bài giảng".
+•Khi ẩn bài giảng, học viên mới sẽ không thấy bài học này, nhưng học viên đã hoàn thành vẫn được
+ghi nhận kết quả trong lịch sử học tập.
+*Biểu mẫu 3.4
+Biểu mẫu dùng để thêm câu hỏi bài
+STT Trường thông tin Kiểu dữ liệu Ghi chú
+1 Mã bài học Chuỗi Gắn câu hỏi vào một bài học cụ thể.
+2 Nội dung câu hỏi Văn bản Nội dung câu hỏi trắc nghiệm.
+3 Danh sách đáp án Tập hợp chuỗi 4 phương án lựa chọn (A, B, C, D).
+4 Đáp án đúng Lựa chọn Xác định phương án chính xác nhất.
+*Quy định 3.4
+Trang 16/ 27
+
+--- PAGE 18 ---
+Nền tảng cung cấp khóa học trực tuyến
+Ràng buộc khi thêm câu hỏi bài tập:
+•Một câu hỏi trắc nghiệm hợp lệ phải có nội dung câu hỏi, chính xác 04 phương án lựa chọn và 01 đáp
+án đúng duy nhất.
+•Câu hỏi phải được gắn định danh (ID) vào một bài giảng hoặc một chương cụ thể để phục vụ việc
+tính toán tiến độ.
+*Biểu mẫu 3.5
+Biểu mẫu dùng để cập nhật câu hỏi bài tập
+STT Trường thông tin Kiểu dữ liệu Ghi chú
+1 Mã câu hỏi Chuỗi ID câu hỏi trong ngân hàng đề.
+2 Nội dung mới Văn bản/Lựa chọn Cập nhật câu hỏi hoặc đáp án.
+*Quy định 3.5
+Ràng buộc khi cập nhật câu hỏi bài tập:
+•Không được thay đổi nội dung đáp án đúng khi bài thi liên quan đang có học viên ở trạng thái "Đang
+làm bài".
+•Mọi thay đổi về nội dung câu hỏi phải được lưu lại trong nhật ký hệ thống để đối soát khi có khiếu
+nại về điểm số.
+*Biểu mẫu 3.6
+Biểu mẫu dùng để ẩn/xóa câu hỏi bài tập
+STT Trường thông tin Kiểu dữ liệu Ghi chú
+1 Mã câu hỏi Chuỗi ID định danh duy nhất của câu hỏi trong ngân hàng.
+2 Mã bài giảng liên quan Chuỗi Dùng để xác định ngữ cảnh và quyền sở hữu.
+3 Hình thức xử lý Danh sách chọn Bao gồm: Tạm ẩn / Xóa (Soft Delete).
+4 Lý do thay đổi Văn bản Ghi chú ngắn gọn lý do (không bắt buộc).
+*Quy định 3.6
+Ràng buộc khi ẩn/xóa câu hỏi bài tập:
+•Chỉ được xóa vật lý câu hỏi khi câu hỏi đó chưa có bất kỳ lượt làm bài nào từ học viên.
+•Nếu câu hỏi đã có dữ liệu làm bài, hệ thống chỉ cho phép chuyển trạng thái sang "Ngưng sử dụng".
+Câu hỏi này sẽ không xuất hiện trong các lượt thi mới nhưng vẫn tồn tại để bảo toàn logic tính điểm
+cũ.
+*Biểu mẫu 4.1
+Biểu mẫu ghi nhận việc tra cứu và tìm kiếm khóa học
+Trang 17/ 27
+
+--- PAGE 19 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Từ khóa Chuỗi ký tự Tìm theo tên hoặc danh mục khóa học.
+2 Mức giá Khoảng số Lọc khóa học theo điều kiện học phí.
+3 Lĩnh vực Chọn trong trường danh mục
+*Quy định 4.1
+Ràng buộc khi tra cứu và tìm kiếm khóa học:
+•Hệ thống tự động gợi ý các khóa học phù hợp dựa trên từ khóa người dùng nhập.
+•Hệ thống chỉ hiển thị kết quả là các khóa học đã ở trạng thái "Đã phê duyệt".
+•Tối ưu hóa tốc độ tìm kiếm và hiển thị kết quả theo thời gian thực.
+*Biểu mẫu 4.2
+Biểu mẫu dành cho Học viên đăng ký tham gia khóa học
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Mã khóa học Chuỗi Khóa học học viên muốn tham gia.
+2 Xác nhận đăng ký Boolean (Y/N) Xác nhận ghi danh vào khóa học.
+*Quy định 4.2
+Ràng buộc khi đăng ký tham gia khóa học:
+•Cho phép hủy đăng ký nếu người dùng chưa bắt đầu tham gia học.
+•Đối với khóa học có phí, nghiệp vụ này chỉ hoàn tất sau khi hệ thống xác nhận thanh toán thành công.
+•Sau khi ghi danh thành công, hệ thống tự động mở quyền truy cập học liệu.
+*Biểu mẫu 4.3
+Biểu mẫu theo dõi tiến độ học tập
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 % Hoàn thành Số Hiển thị tiến trình học tập cá nhân.
+2 Bài học gần nhất Mã bài giảng Tự động lưu trữ vị trí học tập.
+*Quy định 4.3
+Ràng buộc khi theo dõi tiến độ học tập:
+•Trạng thái chỉ được chuyển sang "1"khi học viên xem đạt ít nhất 90% thời lượng video.
+•Một bài học đã ở trạng thái hoàn thành thì không thể quay lại trạng thái chưa hoàn thành (ngoại trừ
+khi có yêu cầu reset từ Admin).
+•Tự động hóa 100% quy trình tính toán và cập nhật phần trăm hoàn thành khóa học.
+Trang 18/ 27
+
+--- PAGE 20 ---
+Nền tảng cung cấp khóa học trực tuyến
+*Biểu mẫu 5.1
+Biểu mẫu thực hiện bài kiểm tra
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Đáp án chọn Radio Button Lựa chọn phương án trả lời duy nhất.
+2 Thời gian còn lại Đồng hồ đếm ngược Tự động đếm ngược thời gian làm bài.
+*Quy định 5.1
+Ràng buộc thực hiện bài kiểm tra:
+•Hệ thống tự động nộp bài khi hết giờ và ghi nhận kết quả tạm thời.
+•Cho phép người dùng cập nhật lại đáp án trước khi nhấn nút Nộp bài chính thức.
+*Biểu mẫu 5.2
+Biểu mẫu đánh giá kết quả
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Tổng số câu đúng Số Thống kê kết quả sau bài thi.
+2 Điểm số Số Tự động tính toán dựa trên thang điểm 10.
+3 Kết quả Chuỗi "Đạt"nếu >= 5 và "Không đạt"nếu < 5
+*Quy định 5.2
+Ràng buộc đánh giá kết quả:
+•Tự động hóa 100% quy trình so khớp đáp án và lưu trữ lịch sử kết quả thi.
+•Đảm bảo tính minh bạch và chính xác của thuật toán chấm điểm.
+*Biểu mẫu 6
+Biểu mẫu này dùng để xuất chứng chỉ/thống kê
+STT Trường/Mục Kiểu dữ liệu Ghi chú
+1 Loại báo cáo Danh sách chọn Chứng chỉ / Báo cáo kết quả học tập.
+2 Định dạng đầu ra Danh sách chọn PDF / Excel.
+*Quy định 6
+Ràng buộc khi thực hiện kết xuất chứng chỉ/thống kê:
+•Hệ thống cho phép kết xuất chứng nhận dưới dạng tệp PDF sau khi học viên đạt đủ điểm tích lũy.
+•Đảm bảo tính minh bạch và độ chính xác của các số liệu thống kê hệ thống.
+•Đề xuất chứng chỉ hoàn thành khóa học cần phải hoàn thành 100% tiến độ khóa học và tất cả các bài
+kiểm tra phải có kết quả "Đạt".
+Trang 19/ 27
+
+--- PAGE 21 ---
+Nền tảng cung cấp khóa học trực tuyến
+3.1.3 Bảng trách nhiệm yêu cầu nghiệp vụ
+STT Thao tác nghiệp vụ Người dùng Phần mềm Ghi chú
+1 Đăng ký tài khoản Cung cấp thông tin tài
+khoảnLưu trữ thông tin đăng
+kýCho phép đăng ký lại
+nếu thông tin không
+hợp lệ.
+2 Đăng nhập hệ thống Cung cấp tài khoản,
+mật khẩuKiểm tra và xác thực
+3 Cập nhật thông tin tài khoản Cung cấp thông tin
+thay đổiCập nhật dữ liệu tài
+khoản
+4 Khóa/Vô hiệu hóa tài khoản Chọn tài khoản cần vô
+hiệu hóaThay đổi trạng thái tài
+khoản
+5 Tạo khóa học mới Cung cấp thông tin
+khóa họcGhi nhận dữ liệu khóa
+học
+6 Cập nhật thông tin khóa học Cung cấp thông tin
+chỉnh sửaCập nhật dữ liệu khóa
+họcCho phép thay đổi nội
+dung và cấu trúc khóa
+học.
+7 Xóa/Ẩn khóa học Chọn khóa học cần
+ẩn/xóaThay đổi trạng thái
+hiển thịThay đổi trạng thái
+8 Phê duyệt nội dung Xem xét và xác nhận Chuyển trạng thái
+công bốQuyền Admin
+9 Thêm bài giảng Tải lên video/tài liệu
+học tậpLưu trữ vào kho học
+liệu
+10 Cập nhật bài giảng Chỉnh sửa nội dung Cập nhật kho học liệu
+11 Ẩn/Xóa bài giảng Chọn bài giảng Thay đổi trạng thái bài
+học
+12 Thêm câu hỏi bài tập Nhập nội dung câu
+hỏi, đáp ánLưu vào ngân hàng câu
+hỏiTự động hóa việc quản
+lý ngân hàng đề thi.
+13 Cập nhật câu hỏi bài tập Chỉnh sửa nội dung Cập nhật ngân hàng
+câu hỏi
+14 Xóa/Ẩn câu hỏi bài tập Chọn câu hỏi Thay đổi trạng thái câu
+hỏi
+15 Tra cứu và tìm kiếm khóa học Nhập từ khóa tìm kiếm Hiển thị kết quả phù
+hợp
+16 Đăng ký tham gia học Chọn khóa học cần
+tham giaGhi nhận danh sách
+học viên
+17 Theo dõi tiến độ học tập Xem tiến độ học tập Tự động tính toán phần
+trămTự động hóa 100% quy
+trình cập nhật tiến độ
+học.
+18 Thực hiện bài kiểm tra Lựa chọn các đáp án Ghi nhận bài làm tạm
+thời
+19 Đánh giá kết quả Chấm điểm và lưu kết
+quảTính toán & Tự động
+hóa 100% quy trình
+chấm điểm và đánh
+giá.
+20 Xuất chứng chỉ và thống kê Chọn yêu cầu xuất báo
+cáoKết xuất tệp
+PDF/Thống kê
+Trang 20/ 27
+
+--- PAGE 22 ---
+Nền tảng cung cấp khóa học trực tuyến
+3.2 Yêu cầu phi chức năng
+3.2.1 Yêu cầu hiệu quả
+- Bảng yêu cầu hiệu quả
+STT Nghiệp vụ Tốc độ xử lý Dung lượng Ghi chú
+1 Quản lý hệ thống Thao tác thành công < 5 giây Tối thiểu (KB) Xác thực nhanh
+2 Quản lý khóa học Lưu trữ/Cập nhật < 10 giây Trung bình (MB) Bao gồm ảnh bìa
+3 Quản lý nội dung Lưu trữ/Cập nhật < 10 giây Lớn (GB) Lưu trữ Video
+4 Quản lý học tập Tra cứu và cập nhật < 5 giây Tối thiểu (KB) Ưu tiên tốc độ
+5 Thi & Đánh giá Tính toán kết quả < 10 giây Thấp (KB) Xử lý logic
+6 Báo cáo Xử lý và kết xuất < 20 giây Trung bình (MB) Tệp tin PDF
+- Bảng trách nhiệm yêu cầu hiệu quả
+STT Nghiệp vụ Người dùng Phần mềm Ghi chú
+1 Quản lý hệ thống Nhập liệu đúng định dạng Xác thực và phản hồi ngay
+2 Quản lý khóa học Cung cấp học liệu chuẩn Tối ưu hóa lưu trữ ảnh
+3 Quản lý nội dung Đảm bảo băng thông tải lên Nén video, xử lý đa luồng Quan trọng
+4 Quản lý học tập Thao tác đúng quy trình học Cập nhật Real-time vào DB
+5 Thi & Đánh giá Đảm bảo kết nối ổn định Xử lý logic chấm điểm nhanh Không delay
+6 Báo cáo Chọn đúng tham số lọc Truy vấn tối ưu, xuất PDF
+3.2.2 Yêu cầu tiện dụng
+- Bảng yêu cầu tiện dung
+STT Nghiệp vụ Mức độ dễ học Mức độ dễ sử dụng Ghi chú
+1 Quản lý hệ thống < 10 phút hướng dẫn Tỷ lệ lỗi thao tác < 1%
+2 Quản lý khóa học < 10 phút hướng dẫn Thao tác tối thiểu (3-5 click) Trực quan
+3 Quản lý nội dung < 15 phút hướng dẫn Hỗ trợ kéo thả, tải tệp nhanh
+4 Quản lý học tập Không cần hướng dẫn Giao diện học tập tập trung Tự động
+5 Thi & Đánh giá < 15 phút hướng dẫn Chỉ dẫn rõ ràng từng bước làm
+bài
+6 Báo cáo Không cần hướng dẫn Thao tác 1-click để kết xuất Có mẫu
+- Bảng trách nhiệm yêu cầu tiện dụng
+Trang 21/ 27
+
+--- PAGE 23 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Nghiệp vụ Người dùng Phần mềm Ghi chú
+1 Quản lý hệ thống Đọc hướng dẫn sử dụng Giao diện đồng nhất, dễ hiểu
+2 Quản lý khóa học Làm quen với bố cục quản lý Cung cấp các Tooltip chỉ dẫn
+3 Quản lý nội dung Thực hiện đúng quy trình tải Thông báo trạng thái tải lên
+4 Quản lý học tập Thao tác theo hướng dẫn Bố cục đơn giản, tập trung nội
+dung
+5 Thi & Đánh giá Đọc quy định làm bài Hiển thị đồng hồ, cảnh báo nộp
+bài
+6 Báo cáo Chọn loại báo cáo cần thiết Tự động điền dữ liệu vào mẫu
+3.2.3 Yêu cầu tương thích
+Bảng yêu cầu tương thích
+STT Nghiệp vụ Đối tượng liên quan Ghi chú
+1 Nhận danh sách người dùng Từ tập tin Excel, CSV Độc lập phiên bản
+2 Đăng bài giảng video Từ nền tảng YouTube, định dạng MP4 Độc lập trình duyệt
+3 Nhập bộ câu hỏi Quiz Từ tập tin Excel mẫu (Template) Độc lập phiên bản
+4 Xuất chứng chỉ hoàn thành Đến tập tin định dạng PDF Tương thích mọi trình đọc
+3.2.4 Yêu cầu tiến hóa
+- Bảng yêu cầu tiến hóa
+STT Nghiệp vụ Tham số cần thay đổi Miền giá trị
+1 Thay đổi quy định chấm điểm Điểm đạt (Passing score) để
+hoàn thành khóa học.Số thực:0≤x≤10
+2 Thay đổi quy định thi Số lần thực hiện bài Quiz tối đa
+cho phép.Số nguyên:n≥1
+3 Thay đổi quy định nội dung Dung lượng tối đa của tệp tin
+video tải lên.100MB≤x≤2GB
+4 Thay đổi danh mục Các lĩnh vực đào tạo, danh mục
+khóa học hiện có.Danh sách chuỗi ký tự
+- Bảng trách nhiệm yêu cầu tiến hóa
+Trang 22/ 27
+
+--- PAGE 24 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Nghiệp vụ Quản trị viên Phần mềm Ghi chú
+1 Thay đổi quy định điểm Cung cấp giá trị điểm đạt
+mới.Cập nhật tham số và tự
+động tính lại trạng thái
+hoàn thành.
+2 Thay đổi quy định thi Nhập số lượt làm bài mới. Cập nhật ràng buộc lượt
+thi trong cơ sở dữ liệu.
+3 Thay đổi quy định nội dung Thiết lập giới hạn dung
+lượng mới.Tự động kiểm tra kích
+thước tệp tin khi người
+dùng tải lên.
+4 Thay đổi danh mục Thêm, xóa hoặc chỉnh sửa
+tên danh mục.Cập nhật cây danh mục
+trên toàn hệ thống.Lưu trữ
+3.3 Yêu cầu hệ thống
+3.3.1 Yêu cầu bảo mật
+- Bảng yêu cầu bảo mật
+STT Nghiệp vụ Thao tác cụ thể Quản trị Giảng viên Học viên Khác
+1
+Quản lý
+hệ thốngĐăng ký tài khoản ✓ ✓
+2 Đăng nhập hệ thống ✓ ✓ ✓
+3 Cập nhật thông tin tài khoản ✓ ✓
+4 Khóa/Vô hiệu hóa tài khoản ✓ ✓ ✓
+5
+Quản lý
+khóa họcTạo khóa học mới ✓
+6 Cập nhật thông tin khóa học ✓
+7 Xóa/Ẩn khóa học ✓
+8 Phê duyệt nội dung ✓
+9
+Quản lý
+nội dungThêm bài giảng ✓
+10 Cập nhật bài giảng ✓
+11 Xóa/Ẩn bài giảng ✓
+12 Thêm câu hỏi bài tập ✓
+13 Cập nhật câu hỏi bài tập ✓
+14 Xóa/Ẩn câu hỏi bài tập ✓
+15
+Quản lý
+học tậpTra cứu và tìm kiếm khóa học ✓ ✓ ✓ ✓
+16 Đăng ký tham gia học ✓
+17 Theo dõi tiến độ học tập ✓ ✓
+18 Thi &
+Đánh giáThực hiện bài kiểm tra ✓
+19 Đánh giá kết quả ✓ ✓
+20Báo cáoXuất chứng chỉ ✓
+21 Thống kê ✓ ✓ ✓
+Trang 23/ 27
+
+--- PAGE 25 ---
+Nền tảng cung cấp khóa học trực tuyến
+- Bảng trách nhiệm yêu cầu bảo mật
+STT Nghiệp vụ Người dùng Phần mềm Ghi chú
+1 Quản trị Cho biết người dùng mới và quyền
+hạn.Ghi nhận và Thực hiện đúng.
+2 Giảng viên Cung cấp tên và mật khẩu. Ghi nhận và Thực hiện đúng.
+3 Học viên Cung cấp tên và mật khẩu. Ghi nhận và Thực hiện đúng.
+4 Khác Tên chung
+3.3.2 Yêu cầu an toàn
+- Bảng yêu cầu an toàn
+STT Nghiệp vụ Đối tượng Ghi chú
+1 Không cho phép xóa Tài khoản người dùng Chỉ được chuyển trạng thái Hoạt
+động/Vô hiệu hóa.
+2 Không cho phép xóa Khóa học Ngăn chặn xóa khi đã có dữ liệu học
+viên đăng ký.
+3 Không cho phép xóa Danh mục khóa học Ràng buộc toàn vẹn khi có khóa học
+đang thuộc về.
+4 Không cho phép xóa Kết quả bài thi (Quiz) Lưu trữ vĩnh viễn để đảm bảo lịch
+sử đào tạo.
+5 Không cho phép xóa Chứng chỉ đã cấp Chỉ cho phép thu hồi hoặc thay đổi
+hiệu lực.
+6 Không cho phép sửa Báo cáo tiến độ, điểm Đảm bảo tính minh bạch, chống
+gian lận kết quả.
+- Bảng trách nhiệm yêu cầu an toàn
+Trang 24/ 27
+
+--- PAGE 26 ---
+Nền tảng cung cấp khóa học trực tuyến
+STT Nghiệp vụ Người dùng Phần mềm
+1 Bảo vệ tài khoản Gửi yêu cầu thay đổi trạng thái. Vô hiệu hóa lệnh xóa vật lý trong cơ
+sở dữ liệu.
+2 Bảo vệ khóa học Tuân thủ quy trình lưu trữ. Kiểm tra ràng buộc học viên trước khi
+ẩn/khóa.
+3 Bảo vệ danh mục Thao tác đúng danh mục quản lý. Kiểm tra tính phụ thuộc (Foreign
+Key) của dữ liệu.
+4 Bảo vệ kết quả Thực hiện nộp bài đúng hạn. Thiết lập thuộc tính Read-only (Chỉ
+đọc) cho bản ghi.
+5 Bảo vệ chứng chỉ Yêu cầu thu hồi khi có sai sót. Lưu vết (Logging) mọi thay đổi về
+trạng thái.
+6 Bảo vệ báo cáo Xem và xuất dữ liệu minh bạch. Chặn mọi quyền chỉnh sửa sau khi đã
+chốt dữ liệu.
+3.4 Yêu cầu công nghệ
+- Bảng yêu cầu công nghệ
+STT Yêu cầu Mô tả chi tiết Ghi chú
+1 Khả năng bảo trì Cấu trúc mã nguồn theo mô hình
+Clean Architecture hoặc Modular.Dễ dàng nâng cấp, bảo trì.
+2 Nền tảng Web Responsive, tương thích tốt trên
+các kích thước màn hình phổ biến.Tối ưu UX/UI cho Mobile.
+3 Cơ sở dữ liệu PostgreSQL (Ưu tiên tính toàn vẹn và
+hỗ trợ dữ liệu JSON).Đảm bảo ACID và hiệu năng.
+4 Backend FastAPI (Python) - Xử lý bất đồng bộ
+(Asynchronous).Tối ưu hiệu năng xử lý API.
+5 Frontend Next.js - Hỗ trợ Server-Side
+Rendering (SSR).Tăng tốc độ tải và tối ưu SEO.
+6 Triển khai Container hóa bằng Docker và quản
+lý trên Cloud Server.Dễ dàng mở rộng (Scaling).
+- Bảng trách nhiệm yêu cầu công nghệ
+STT Nghiệp vụ Kỹ thuật/Vận hành Kiến trúc hệ thống
+1 Vận hành Backend Phát triển Service Cung cấp API và Swagger
+2 Vận hành Frontend Xây dựng giao diện Tối ưu hóa hiển thị đa thiết bị
+3 Vận hành CSDL Thiết kế lược đồ Duy trì tính nhất quán dữ liệu
+4 Bảo trì hệ thống Cấu hình Docker/Cloud Đảm bảo tính sẵn sàng cao
+Trang 25/ 27
+
+--- PAGE 27 ---
+Nền tảng cung cấp khóa học trực tuyến
+4 MÔ HÌNH HÓA YÊU CẦU
+4.1 Sơ đồ User Case
+Gi ảng viênQu ản tr ị  viênQu ản lý tài
+kho ả n
+Đăng ký tài kho ả n
+Đăng nh ậ p h ệ  th ố ng
+C ập nh ậ t thông tin tài kho ả n
+Khóa/ Vô hi ệ u hóa tài kho ả n
+Qu ản lý khóa
+h ọc
+T ạo khóa h ọ c m ớ i
+C ập nh ậ t thông tin khóa h ọ c
+Xóa/ Ẩ n khóa h ọ c
+Phê duy ệ t n ộ i dung
+Qu ản lý n ộ i
+dung
+Thêm bài gi ả ng
+C ập nh ậ t bài gi ả ng
+Xóa/ Ẩ n bài gi ả ng
+Thêm câu h ỏ i bài t ậ p
+C ập nh ậ t câu h ỏ i bài t ậ p
+Xóa/ Ẩ n câu h ỏ i bài t ậ p
+Qu ản lý h ọ c
+t ập
+Tìm ki ế m khóa h ọ c
+Đăng ký tham gia h ọ c
+Theo dõi ti ế n đ ộ  h ọ c t ậ p
+Thi & Đánh
+giá
+Th ực hi ệ n bài ki ể m tra
+Theo dõi k ế t qu ả  bài ki ể m tra
+Báo cáo
+Xu ất ch ứ ng ch ỉ  H ọc viên
+Th ống kê
+Hình 1: Sơ đồ User Case tổng quát
+Trang 26/ 27
+
+--- PAGE 28 ---
+Nền tảng cung cấp khóa học trực tuyến
+5 THIẾT KẾ HỆ THỐNG
+6 THIẾT KẾ DỮ LIỆU
+7 THIẾT KẾ GIAO DIỆN
+8 TỔNG KẾT
+Trang 27/ 27
+
