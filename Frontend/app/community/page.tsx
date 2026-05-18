@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { getStoredUser, redirectPathForRole, roleLabel } from "@/lib/auth"
 import {
   GraduationCap,
   BookOpen,
@@ -36,50 +37,32 @@ const sidebarItems = [
   { name: "Cài đặt", icon: Settings, href: "/profile", active: false },
 ]
 
-const discussions = [
-  {
-    id: 1,
-    title: "Ai đã làm xong project REST API của khóa Web Development?",
-    author: "Linh Tran",
-    tag: "Lập trình",
-    replies: 18,
-    likes: 34,
-    time: "12 phút trước",
-    excerpt: "Mình đang tới phần auth và muốn so sánh cách tổ chức folder backend giữa mọi người.",
-  },
-  {
-    id: 2,
-    title: "Nhóm học Business Strategy tối nay còn slot không?",
-    author: "Minh Hoang",
-    tag: "Nhóm học",
-    replies: 9,
-    likes: 12,
-    time: "35 phút trước",
-    excerpt: "Mình muốn tham gia để cùng review case study tuần này trước khi nộp bài.",
-  },
-  {
-    id: 3,
-    title: "Chia sẻ bộ flashcard tự tạo cho Spanish A2",
-    author: "Thao Nguyen",
-    tag: "Tài nguyên",
-    replies: 24,
-    likes: 51,
-    time: "1 giờ trước",
-    excerpt: "Mình tổng hợp lại từ vựng và mẫu câu hay gặp, ai cần mình gửi thêm file CSV.",
-  },
-]
+type Discussion = {
+  id: number
+  title: string
+  author: string
+  tag: string
+  replies: number
+  likes: number
+  time: string
+  excerpt: string
+}
 
-const groups = [
-  { name: "Frontend Builders", members: 248, activity: "Rất sôi nổi" },
-  { name: "Business Case Lab", members: 134, activity: "Đang tuyển thành viên" },
-  { name: "Spanish Speaking Club", members: 91, activity: "Họp thứ 7 hàng tuần" },
-]
+type StudyGroup = {
+  name: string
+  members: number
+  activity: string
+}
 
-const topContributors = [
-  { name: "Mai Anh", posts: 42, badge: "Mentor" },
-  { name: "Quoc Dat", posts: 31, badge: "Top helper" },
-  { name: "Bao Nhi", posts: 27, badge: "Resource sharer" },
-]
+type Contributor = {
+  name: string
+  posts: number
+  badge: string
+}
+
+const discussions: Discussion[] = []
+const groups: StudyGroup[] = []
+const topContributors: Contributor[] = []
 
 export default function CommunityPage() {
   const router = useRouter()
@@ -90,33 +73,19 @@ export default function CommunityPage() {
   useEffect(() => {
     if (typeof window === "undefined") return
 
-    const storedAuth = localStorage.getItem("learnhub-demo-auth")
+    const storedUser = getStoredUser()
 
-    if (!storedAuth) {
+    if (!storedUser) {
       router.push("/login")
       return
     }
 
-    try {
-      const parsed = JSON.parse(storedAuth)
-
-      if (!parsed?.username || !parsed?.role) {
-        localStorage.removeItem("learnhub-demo-auth")
-        router.push("/login")
-        return
-      }
-
-      if (parsed.role !== "Học viên") {
-        const redirectPath = parsed.role === "Quản trị viên" ? "/admin" : "/instructor"
-        router.push(redirectPath)
-        return
-      }
-
-      setAuth(parsed)
-    } catch {
-      localStorage.removeItem("learnhub-demo-auth")
-      router.push("/login")
+    if (storedUser.role !== "student") {
+      router.push(redirectPathForRole(storedUser.role))
+      return
     }
+
+    setAuth({ username: storedUser.username, role: roleLabel(storedUser.role) })
   }, [router])
 
   if (!auth) {
@@ -207,8 +176,7 @@ export default function CommunityPage() {
                   <div className="absolute right-0 mt-2 w-72 rounded-lg border border-border bg-card p-4 shadow-lg">
                     <h3 className="font-semibold text-foreground">Hoạt động cộng đồng</h3>
                     <div className="mt-3 space-y-3 text-sm text-muted-foreground">
-                      <p>Có 5 phản hồi mới trong chủ đề bạn theo dõi.</p>
-                      <p>Nhóm Frontend Builders vừa lên lịch buổi review project cuối tuần này.</p>
+                      <p>Chưa có hoạt động cộng đồng mới.</p>
                     </div>
                   </div>
                 )}
@@ -243,7 +211,7 @@ export default function CommunityPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Thảo luận đang mở</p>
-                    <p className="mt-1 text-3xl font-bold text-foreground">128</p>
+                    <p className="mt-1 text-3xl font-bold text-foreground">0</p>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                     <MessageSquare className="h-6 w-6 text-primary" />
@@ -256,7 +224,7 @@ export default function CommunityPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Nhóm học đang hoạt động</p>
-                    <p className="mt-1 text-3xl font-bold text-foreground">24</p>
+                    <p className="mt-1 text-3xl font-bold text-foreground">0</p>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
                     <Users className="h-6 w-6 text-green-600" />
@@ -269,7 +237,7 @@ export default function CommunityPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Bài viết nổi bật hôm nay</p>
-                    <p className="mt-1 text-3xl font-bold text-foreground">7</p>
+                    <p className="mt-1 text-3xl font-bold text-foreground">0</p>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">
                     <TrendingUp className="h-6 w-6 text-accent" />
@@ -290,7 +258,12 @@ export default function CommunityPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {discussions.map((discussion) => (
+                  {discussions.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                      Chưa có thảo luận nào trong cộng đồng.
+                    </div>
+                  ) : (
+                    discussions.map((discussion) => (
                     <div key={discussion.id} className="rounded-xl border border-border p-5">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
@@ -318,7 +291,7 @@ export default function CommunityPage() {
                         </span>
                       </div>
                     </div>
-                  ))}
+                  )))}
                 </CardContent>
               </Card>
 
@@ -345,7 +318,12 @@ export default function CommunityPage() {
                   <CardTitle>Nhóm học nổi bật</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {groups.map((group) => (
+                  {groups.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                      Chưa có nhóm học nào.
+                    </div>
+                  ) : (
+                    groups.map((group) => (
                     <div key={group.name} className="rounded-lg border border-border p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -358,7 +336,7 @@ export default function CommunityPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  )))}
                 </CardContent>
               </Card>
 
@@ -367,7 +345,12 @@ export default function CommunityPage() {
                   <CardTitle>Thành viên tích cực</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {topContributors.map((member) => (
+                  {topContributors.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                      Chưa có dữ liệu thành viên tích cực.
+                    </div>
+                  ) : (
+                    topContributors.map((member) => (
                     <div key={member.name} className="flex items-center justify-between rounded-lg border border-border p-4">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
@@ -380,7 +363,7 @@ export default function CommunityPage() {
                       </div>
                       <Badge>{member.badge}</Badge>
                     </div>
-                  ))}
+                  )))}
                 </CardContent>
               </Card>
             </div>

@@ -258,7 +258,7 @@ export default function CourseDetailPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
-              <Link href="/dashboard">
+              <Link href="/search">
                 <ChevronLeft className="h-5 w-5" />
               </Link>
             </Button>

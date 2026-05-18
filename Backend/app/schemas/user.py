@@ -37,6 +37,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     full_name: str | None = None
     phone: str | None = None
+    current_password: str | None = None
     password: str | None = None
 
     @field_validator("password")

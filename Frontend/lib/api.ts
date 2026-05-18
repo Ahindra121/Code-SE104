@@ -1,3 +1,5 @@
+import { getStoredToken } from "@/lib/auth"
+
 export type ApiResponse<T> = {
   success: boolean
   message: string
@@ -19,7 +21,7 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("learnhub-auth-token") : null
+  const token = typeof window !== "undefined" ? getStoredToken() : null
   const headers = new Headers(options.headers)
 
   if (!headers.has("Content-Type") && options.body) {

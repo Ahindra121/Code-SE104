@@ -5,7 +5,13 @@ export type LearnHubUser = {
   full_name?: string | null
   role: "student" | "instructor" | "admin"
   is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
+
+const TOKEN_KEY = "learnhub-auth-token"
+const USER_KEY = "learnhub-user"
+const LEGACY_DEMO_KEY = "learnhub-demo-auth"
 
 export function roleLabel(role: LearnHubUser["role"]) {
   if (role === "admin") return "Quản trị viên"
@@ -13,33 +19,23 @@ export function roleLabel(role: LearnHubUser["role"]) {
   return "Học viên"
 }
 
-function legacyRoleLabel(role: LearnHubUser["role"]) {
-  if (role === "admin") return "Quáº£n trá»‹ viÃªn"
-  if (role === "instructor") return "Giáº£ng viÃªn"
-  return "Há»c viÃªn"
-}
-
 export function saveAuth(token: string, user: LearnHubUser) {
-  localStorage.setItem("learnhub-auth-token", token)
-  localStorage.setItem("learnhub-user", JSON.stringify(user))
-  localStorage.setItem(
-    "learnhub-demo-auth",
-    JSON.stringify({
-      username: user.username,
-      role: legacyRoleLabel(user.role),
-      apiRole: user.role,
-    })
-  )
+  // Ignore old demo/local auth on purpose. A user must log in in the current browser session.
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(LEGACY_DEMO_KEY)
+  sessionStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 
 export function getStoredToken(): string | null {
-  return localStorage.getItem("learnhub-auth-token")
+  return sessionStorage.getItem(TOKEN_KEY)
 }
 
 export function getStoredUser(): LearnHubUser | null {
   if (!getStoredToken()) return null
 
-  const stored = localStorage.getItem("learnhub-user")
+  const stored = sessionStorage.getItem(USER_KEY)
   if (!stored) return null
 
   try {
@@ -52,9 +48,11 @@ export function getStoredUser(): LearnHubUser | null {
 }
 
 export function clearAuth() {
-  localStorage.removeItem("learnhub-auth-token")
-  localStorage.removeItem("learnhub-user")
-  localStorage.removeItem("learnhub-demo-auth")
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(USER_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(LEGACY_DEMO_KEY)
 }
 
 export function redirectPathForRole(role: LearnHubUser["role"]) {

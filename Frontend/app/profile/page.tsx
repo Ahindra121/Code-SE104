@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import {
   GraduationCap,
@@ -22,8 +22,6 @@ import {
   EyeOff,
   BookOpen,
   Award,
-  Clock,
-  Target,
   Edit3,
   Save,
   X,
@@ -45,46 +43,26 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
-
-const userData = {
-  id: "USR001",
-  fullName: "Nguyễn Tuấn Kiệt",
-  username: "tuankiet_24",
-  email: "tuankiet@gmail.com",
-  phone: "0901234567",
-  avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop",
-  role: "student",
-  bio: "Sinh viên năm 3 ngành Khoa học Máy tính tại UIT. Đam mê học hỏi và phát triển bản thân.",
-  joinDate: "15/01/2024",
-  stats: {
-    coursesEnrolled: 12,
-    coursesCompleted: 8,
-    totalHours: 156,
-    certificates: 5,
-  },
-}
-
-const recentCourses = [
-  { id: 1, title: "React & Next.js Masterclass", progress: 75, image: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=100&h=60&fit=crop" },
-  { id: 2, title: "Python for Data Science", progress: 45, image: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=100&h=60&fit=crop" },
-  { id: 3, title: "UI/UX Design Fundamentals", progress: 90, image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=100&h=60&fit=crop" },
-]
-
-const achievements = [
-  { id: 1, title: "Học viên chăm chỉ", description: "Hoàn thành 5 khóa học", icon: Award, color: "text-yellow-500" },
-  { id: 2, title: "Người bắt đầu", description: "Đăng ký khóa học đầu tiên", icon: Target, color: "text-green-500" },
-  { id: 3, title: "100 giờ học", description: "Tích lũy 100 giờ học tập", icon: Clock, color: "text-blue-500" },
-]
+import { apiFetch } from "@/lib/api"
+import { clearAuth, getStoredUser, LearnHubUser, roleLabel } from "@/lib/auth"
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const [user, setUser] = useState<LearnHubUser | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [formData, setFormData] = useState({
-    fullName: userData.fullName,
-    phone: userData.phone,
-    email: userData.email,
-    bio: userData.bio,
+    fullName: "",
+    phone: "",
+    email: "",
+    bio: "",
   })
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -98,15 +76,93 @@ export default function ProfilePage() {
     promotions: false,
   })
 
-  const handleSaveProfile = () => {
-    // Save profile logic
-    setIsEditing(false)
+  useEffect(() => {
+    if (!getStoredUser()) {
+      router.push("/login")
+      return
+    }
+
+    async function loadProfile() {
+      try {
+        setLoading(true)
+        setError(null)
+        const result = await apiFetch<LearnHubUser>("/auth/me")
+        setUser(result.data)
+        setFormData({
+          fullName: result.data.full_name ?? "",
+          phone: result.data.phone ?? "",
+          email: result.data.email,
+          bio: "",
+        })
+      } catch (err) {
+        clearAuth()
+        router.push("/login")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [router])
+
+  const handleSaveProfile = async () => {
+    try {
+      setError(null)
+      setMessage(null)
+      const result = await apiFetch<LearnHubUser>("/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          full_name: formData.fullName.trim() || null,
+          phone: formData.phone.trim() || null,
+        }),
+      })
+      setUser(result.data)
+      setMessage("Đã cập nhật thông tin tài khoản.")
+      setIsEditing(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không cập nhật được thông tin")
+    }
   }
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Change password logic
-    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
+    setPasswordError(null)
+    setPasswordMessage(null)
+
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setPasswordError("Vui lòng nhập đầy đủ thông tin đổi mật khẩu.")
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError("Xác nhận mật khẩu mới không khớp.")
+      return
+    }
+
+    try {
+      await apiFetch<LearnHubUser>("/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          current_password: passwordData.currentPassword,
+          password: passwordData.newPassword,
+        }),
+      })
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      setShowCurrentPassword(false)
+      setShowNewPassword(false)
+      setShowConfirmPassword(false)
+      setPasswordMessage("Đã cập nhật mật khẩu thành công.")
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Mật khẩu hiện tại không đúng.")
+    }
+  }
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Đang tải hồ sơ...</p>
+      </div>
+    )
   }
 
   return (
@@ -133,6 +189,9 @@ export default function ProfilePage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {message && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">{message}</div>}
+        {error && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
+
         {/* Profile Header */}
         <Card className="mb-8 overflow-hidden">
           <div className="h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20" />
@@ -140,8 +199,8 @@ export default function ProfilePage() {
             <div className="flex flex-col md:flex-row md:items-end gap-6 -mt-16">
               <div className="relative">
                 <Avatar className="h-32 w-32 border-4 border-card shadow-lg">
-                  <AvatarImage src={userData.avatar} alt={userData.fullName} />
-                  <AvatarFallback className="text-3xl">{userData.fullName.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={""} alt={(formData.fullName || user.username)} />
+                  <AvatarFallback className="text-3xl">{(formData.fullName || user.username).charAt(0)}</AvatarFallback>
                 </Avatar>
                 <button className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors">
                   <Camera className="h-4 w-4" />
@@ -150,13 +209,13 @@ export default function ProfilePage() {
               <div className="flex-1 pb-4">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-foreground">{userData.fullName}</h1>
-                    <p className="text-muted-foreground">@{userData.username}</p>
+                    <h1 className="text-2xl font-bold text-foreground">{(formData.fullName || user.username)}</h1>
+                    <p className="text-muted-foreground">@{user.username}</p>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant="secondary" className="bg-primary/10 text-primary">
-                        {userData.role === "student" ? "Học viên" : "Giảng viên"}
+                        {roleLabel(user.role)}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">Tham gia từ {userData.joinDate}</span>
+                      <span className="text-sm text-muted-foreground">Tham gia từ {(user.created_at ? new Date(user.created_at).toLocaleDateString("vi-VN") : "-")}</span>
                     </div>
                   </div>
                   <Button onClick={() => setIsEditing(!isEditing)} variant={isEditing ? "outline" : "default"}>
@@ -179,19 +238,19 @@ export default function ProfilePage() {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{userData.stats.coursesEnrolled}</div>
+                <div className="text-2xl font-bold text-primary">{0}</div>
                 <div className="text-sm text-muted-foreground">Khóa học đã đăng ký</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{userData.stats.coursesCompleted}</div>
+                <div className="text-2xl font-bold text-green-600">{0}</div>
                 <div className="text-sm text-muted-foreground">Khóa học hoàn thành</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{userData.stats.totalHours}h</div>
+                <div className="text-2xl font-bold text-blue-600">{0}h</div>
                 <div className="text-sm text-muted-foreground">Giờ học tập</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">{userData.stats.certificates}</div>
+                <div className="text-2xl font-bold text-yellow-600">{0}</div>
                 <div className="text-sm text-muted-foreground">Chứng chỉ</div>
               </div>
             </div>
@@ -253,8 +312,7 @@ export default function ProfilePage() {
                           id="email"
                           type="email"
                           value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          disabled={!isEditing}
+                          disabled
                           className="pl-10"
                         />
                       </div>
@@ -306,6 +364,7 @@ export default function ProfilePage() {
                           />
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           >
@@ -328,6 +387,7 @@ export default function ProfilePage() {
                           />
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => setShowNewPassword(!showNewPassword)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                           >
@@ -343,14 +403,33 @@ export default function ProfilePage() {
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             id="confirmPassword"
-                            type="password"
+                            type={showConfirmPassword ? "text" : "password"}
                             value={passwordData.confirmPassword}
                             onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             placeholder="Nhập lại mật khẩu mới"
                           />
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          >
+                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
                       </div>
+
+                      {passwordMessage && (
+                        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+                          {passwordMessage}
+                        </div>
+                      )}
+                      {passwordError && (
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                          {passwordError}
+                        </div>
+                      )}
 
                       <Button type="submit">
                         <Shield className="h-4 w-4 mr-2" />
@@ -479,7 +558,6 @@ export default function ProfilePage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Recent Courses */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -488,33 +566,19 @@ export default function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {recentCourses.map((course) => (
-                  <Link key={course.id} href={`/course/${course.id}`} className="flex gap-3 group">
-                    <img
-                      src={course.image}
-                      alt={course.title}
-                      className="w-16 h-12 rounded object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
-                        {course.title}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Progress value={course.progress} className="h-1.5 flex-1" />
-                        <span className="text-xs text-muted-foreground">{course.progress}%</span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                  <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
+                  <p className="mt-3 text-sm font-medium text-foreground">Chưa có dữ liệu khóa học gần đây</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Thông tin này sẽ hiển thị khi bạn bắt đầu học từ tiến độ thật.</p>
+                </div>
                 <Link href="/dashboard">
                   <Button variant="outline" className="w-full mt-2">
-                    Xem tất cả khóa học
+                    Xem khóa học của tôi
                   </Button>
                 </Link>
               </CardContent>
             </Card>
 
-            {/* Achievements */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -523,20 +587,14 @@ export default function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {achievements.map((achievement) => (
-                  <div key={achievement.id} className="flex items-center gap-3">
-                    <div className={`h-10 w-10 rounded-full bg-muted flex items-center justify-center ${achievement.color}`}>
-                      <achievement.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-foreground">{achievement.title}</h4>
-                      <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                    </div>
-                  </div>
-                ))}
+                <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                  <Award className="mx-auto h-8 w-8 text-muted-foreground" />
+                  <p className="mt-3 text-sm font-medium text-foreground">Chưa có thành tựu</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Chứng chỉ và thành tựu sẽ được cập nhật từ kết quả học tập thật.</p>
+                </div>
                 <Link href="/certificates">
                   <Button variant="outline" className="w-full mt-2">
-                    Xem tất cả thành tựu
+                    Xem chứng chỉ
                   </Button>
                 </Link>
               </CardContent>

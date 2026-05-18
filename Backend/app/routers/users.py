@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.entities import User, UserRole
 from app.schemas.common import ok
@@ -30,13 +30,15 @@ def get_user(user_id: int, db: Session = Depends(get_db), current_user: User = D
 
 @router.patch("/me")
 def update_me(payload: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if payload.email and payload.email != current_user.email and db.scalar(select(User).where(User.email == payload.email)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
-    for field in ["email", "full_name", "phone"]:
+    if payload.email and payload.email != current_user.email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email cannot be changed")
+    for field in ["full_name", "phone"]:
         value = getattr(payload, field)
         if value is not None:
             setattr(current_user, field, value)
     if payload.password:
+        if not payload.current_password or not verify_password(payload.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
         current_user.hashed_password = get_password_hash(payload.password)
     db.commit()
     db.refresh(current_user)

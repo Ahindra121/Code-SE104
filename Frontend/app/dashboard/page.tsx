@@ -25,7 +25,7 @@ import {
   BarChart3,
   Users,
 } from "lucide-react"
-import { getStoredUser, redirectPathForRole, roleLabel } from "@/lib/auth"
+import { clearAuth, getStoredUser, redirectPathForRole, roleLabel, LearnHubUser } from "@/lib/auth"
 
 const notifications = [
   {
@@ -143,6 +143,15 @@ export default function StudentDashboard() {
         setLoading(true)
         setError(null)
 
+        const meRes = await apiFetch<LearnHubUser>("/auth/me")
+
+        if (meRes.data.role !== "student") {
+          router.push(redirectPathForRole(meRes.data.role))
+          return
+        }
+
+        setAuth({ username: meRes.data.username, role: roleLabel(meRes.data.role) })
+
         const [enrollmentsRes, reportRes, coursesRes] = await Promise.all([
           apiFetch<Enrollment[]>("/enrollments/mine"),
           apiFetch<StudentReport>("/reports/student"),
@@ -153,6 +162,8 @@ export default function StudentDashboard() {
         setReport(reportRes.data)
         setRecommended(coursesRes.data.items)
       } catch (err) {
+        clearAuth()
+        router.push("/login")
         setError(err instanceof Error ? err.message : "Không tải được dữ liệu dashboard")
       } finally {
         setLoading(false)
