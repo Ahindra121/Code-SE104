@@ -1,15 +1,67 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
-from app.dependencies.auth import get_current_user, require_roles
-from app.models.entities import Course, CourseStatus, User, UserRole
+from app.dependencies.auth import get_optional_current_user, require_roles
+from app.models.entities import Course, CourseDeletionRequest, CourseDeletionRequestStatus, CourseStatus, Enrollment, EnrollmentStatus, User, UserRole
 from app.schemas.common import ok
-from app.schemas.course import CourseCreate, CourseListOut, CourseModeration, CourseUpdate
+from app.schemas.course import (
+    CourseCreate,
+    CourseDeletionRequestCreate,
+    CourseDeletionRequestOut,
+    CourseDeletionReview,
+    CourseListOut,
+    CourseModeration,
+    CourseUpdate,
+)
 from app.services.course_service import assert_course_owner, course_to_out
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
+CONTENT_RESTORE_DAYS = 30
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _can_restore(deleted_at: datetime | None) -> bool:
+    if deleted_at is None:
+        return True
+    if deleted_at.tzinfo is None:
+        deleted_at = deleted_at.replace(tzinfo=UTC)
+    return deleted_at >= _now() - timedelta(days=CONTENT_RESTORE_DAYS)
+
+
+def _active_student_count(db: Session, course_id: int) -> int:
+    return db.scalar(
+        select(func.count(Enrollment.id)).where(
+            Enrollment.course_id == course_id,
+            Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
+        )
+    ) or 0
+
+
+def _can_view_deleted_course(db: Session, course: Course, user: User | None) -> bool:
+    if not user:
+        return False
+    if user.role == UserRole.admin:
+        return True
+    if user.role == UserRole.instructor and course.instructor_id == user.id:
+        return True
+    if user.role == UserRole.student:
+        return bool(
+            db.scalar(
+                select(Enrollment).where(
+                    Enrollment.student_id == user.id,
+                    Enrollment.course_id == course.id,
+                    Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
+                )
+            )
+        )
+    return False
 
 
 @router.get("")
@@ -69,11 +121,15 @@ def create_course(payload: CourseCreate, db: Session = Depends(get_db), current_
 
 
 @router.get("/{course_id}")
-def get_course(course_id: int, db: Session = Depends(get_db)):
+def get_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
     course = db.scalars(
-        select(Course).options(joinedload(Course.instructor), joinedload(Course.lessons)).where(Course.id == course_id, Course.is_deleted.is_(False))
+        select(Course).options(joinedload(Course.instructor), joinedload(Course.lessons)).where(Course.id == course_id)
     ).unique().first()
-    if not course:
+    if not course or (course.is_deleted and not _can_view_deleted_course(db, course, current_user)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     return ok(course_to_out(db, course))
 
@@ -99,15 +155,64 @@ def update_course(
 
 
 @router.delete("/{course_id}")
-def soft_delete_course(course_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.instructor))):
+def soft_delete_course(
+    course_id: int,
+    payload: CourseDeletionRequestCreate | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.instructor)),
+):
     course = db.get(Course, course_id)
     if not course or course.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     assert_course_owner(course, current_user)
+    student_count = _active_student_count(db, course.id)
+    if student_count > 0:
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Course has enrolled students. Please provide a deletion reason for admin approval.",
+            )
+        existing = db.scalar(
+            select(CourseDeletionRequest).where(
+                CourseDeletionRequest.course_id == course.id,
+                CourseDeletionRequest.status == CourseDeletionRequestStatus.pending,
+            )
+        )
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A deletion request is already pending")
+        request = CourseDeletionRequest(
+            course_id=course.id,
+            instructor_id=current_user.id,
+            reason=payload.reason,
+            student_count=student_count,
+        )
+        db.add(request)
+        db.commit()
+        db.refresh(request)
+        return ok(CourseDeletionRequestOut.model_validate(request), "Course deletion request sent to admin")
     course.is_deleted = True
+    course.deleted_at = _now()
     course.status = CourseStatus.archived
     db.commit()
-    return ok(None, "Course archived")
+    return ok(None, "Đã lưu trữ khóa học")
+
+
+@router.patch("/{course_id}/restore")
+def restore_course(course_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.instructor))):
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy khóa học")
+    assert_course_owner(course, current_user)
+    if not course.is_deleted:
+        return ok(course_to_out(db, course), "Khóa học đang hoạt động")
+    if not _can_restore(course.deleted_at):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Khóa học đã quá thời hạn khôi phục")
+    course.is_deleted = False
+    course.deleted_at = None
+    course.status = CourseStatus.draft
+    db.commit()
+    db.refresh(course)
+    return ok(course_to_out(db, course), "Đã khôi phục khóa học")
 
 
 @router.patch("/{course_id}/moderation")
@@ -119,6 +224,8 @@ def moderate_course(
 ):
     if payload.status not in [CourseStatus.approved, CourseStatus.rejected]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin can only approve or reject courses")
+    if payload.status == CourseStatus.rejected and not (payload.rejection_reason or "").strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rejection reason is required")
     course = db.get(Course, course_id)
     if not course or course.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
@@ -127,3 +234,64 @@ def moderate_course(
     db.commit()
     db.refresh(course)
     return ok(course_to_out(db, course), "Course moderation updated")
+
+
+@router.get("/deletion-requests/pending")
+def list_pending_deletion_requests(db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.admin))):
+    requests = db.scalars(
+        select(CourseDeletionRequest)
+        .options(joinedload(CourseDeletionRequest.course).joinedload(Course.instructor), joinedload(CourseDeletionRequest.instructor))
+        .where(CourseDeletionRequest.status == CourseDeletionRequestStatus.pending)
+        .order_by(CourseDeletionRequest.created_at.desc())
+    ).unique().all()
+    return ok([CourseDeletionRequestOut.model_validate(request) for request in requests])
+
+
+@router.patch("/deletion-requests/{request_id}/approve")
+def approve_deletion_request(
+    request_id: int,
+    payload: CourseDeletionReview,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.admin)),
+):
+    request = db.get(CourseDeletionRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deletion request not found")
+    if request.status != CourseDeletionRequestStatus.pending:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deletion request already reviewed")
+    course = db.get(Course, request.course_id)
+    if not course or course.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    course.is_deleted = True
+    course.deleted_at = _now()
+    course.status = CourseStatus.archived
+    request.status = CourseDeletionRequestStatus.approved
+    request.admin_response = payload.response
+    request.reviewed_by_id = current_user.id
+    request.reviewed_at = _now()
+    db.commit()
+    db.refresh(request)
+    return ok(CourseDeletionRequestOut.model_validate(request), "Course deletion request approved")
+
+
+@router.patch("/deletion-requests/{request_id}/reject")
+def reject_deletion_request(
+    request_id: int,
+    payload: CourseDeletionReview,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.admin)),
+):
+    if not (payload.response or "").strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin response is required")
+    request = db.get(CourseDeletionRequest, request_id)
+    if not request:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deletion request not found")
+    if request.status != CourseDeletionRequestStatus.pending:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deletion request already reviewed")
+    request.status = CourseDeletionRequestStatus.rejected
+    request.admin_response = payload.response
+    request.reviewed_by_id = current_user.id
+    request.reviewed_at = _now()
+    db.commit()
+    db.refresh(request)
+    return ok(CourseDeletionRequestOut.model_validate(request), "Course deletion request rejected")

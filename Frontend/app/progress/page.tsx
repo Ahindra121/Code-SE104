@@ -117,7 +117,7 @@ export default function ProgressPage() {
   }, [router])
 
   const courseProgress = useMemo(() => {
-    return enrollments.filter((enrollment) => enrollment.status === "active").map((enrollment) => {
+    return enrollments.filter((enrollment) => ["active", "completed"].includes(enrollment.status)).map((enrollment) => {
       const course = enrollment.course
       const completed =
         report?.progress_records.filter((item) => item.course_id === enrollment.course_id && item.is_completed)
@@ -329,7 +329,7 @@ export default function ProgressPage() {
                           </Button>
                         )}
                         <Button size="sm" variant="outline" asChild>
-                          <Link href={`/course/${enrollment.course_id}`}>
+                          <Link href={`/course/${enrollment.course_id}?returnTo=/progress`}>
                             Tiếp tục học <ChevronRight className="h-4 w-4" />
                           </Link>
                         </Button>

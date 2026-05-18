@@ -26,6 +26,7 @@ import {
   Users,
 } from "lucide-react"
 import { clearAuth, getStoredUser, redirectPathForRole, roleLabel, LearnHubUser } from "@/lib/auth"
+import { LogoutButton } from "@/components/logout-button"
 
 const notifications = [
   {
@@ -199,10 +200,17 @@ export default function StudentDashboard() {
   }
 
   const completedLessons = report?.progress_records.filter((item) => item.is_completed).length ?? 0
+  const completedCourses = enrollments.filter((enrollment) => {
+    const total = enrollment.course?.lessons_count ?? 0
+    const completed =
+      report?.progress_records.filter((item) => item.course_id === enrollment.course_id && item.is_completed)
+        .length ?? 0
+    return total > 0 && completed >= total
+  }).length
 
   const stats = {
     totalCourses: enrollments.length,
-    completedCourses: 0,
+    completedCourses,
     completedLessons,
     certificates: report?.certificates.length ?? 0,
   }
@@ -255,6 +263,10 @@ export default function StudentDashboard() {
 
           {/* User Info */}
           <div className="p-4 border-t border-sidebar-border">
+            <LogoutButton
+              variant="outline"
+              className="mb-3 w-full justify-start border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
+            />
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src="" />
@@ -460,7 +472,7 @@ export default function StudentDashboard() {
                             </div>
 
                             <Button size="sm" className="gap-2" asChild>
-                              <Link href={`/course/${course.id}`}>
+                              <Link href={`/course/${course.id}?returnTo=/dashboard`}>
                                 <Play className="h-4 w-4" /> Tiếp tục
                               </Link>
                             </Button>
@@ -492,7 +504,7 @@ export default function StudentDashboard() {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {recommended.map((course) => (
-                    <Link href={`/course/${course.id}`} key={course.id}>
+                    <Link href={`/course/${course.id}?returnTo=/dashboard`} key={course.id}>
                       <div className="group rounded-lg border border-border overflow-hidden hover:shadow-md transition-all">
                         <div className="aspect-video overflow-hidden bg-muted">
                           <img

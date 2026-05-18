@@ -44,7 +44,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
 import { apiFetch } from "@/lib/api"
-import { clearAuth, getStoredUser, LearnHubUser, roleLabel } from "@/lib/auth"
+import { clearAuth, getStoredUser, LearnHubUser, redirectPathForRole, roleLabel, updateStoredUser } from "@/lib/auth"
+import { LogoutButton } from "@/components/logout-button"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -92,7 +93,7 @@ export default function ProfilePage() {
           fullName: result.data.full_name ?? "",
           phone: result.data.phone ?? "",
           email: result.data.email,
-          bio: "",
+          bio: result.data.bio ?? "",
         })
       } catch (err) {
         clearAuth()
@@ -114,9 +115,18 @@ export default function ProfilePage() {
         body: JSON.stringify({
           full_name: formData.fullName.trim() || null,
           phone: formData.phone.trim() || null,
+          bio: formData.bio.trim() || null,
         }),
       })
       setUser(result.data)
+      updateStoredUser(result.data)
+      setFormData((prev) => ({
+        ...prev,
+        fullName: result.data.full_name ?? "",
+        phone: result.data.phone ?? "",
+        email: result.data.email,
+        bio: result.data.bio ?? "",
+      }))
       setMessage("Đã cập nhật thông tin tài khoản.")
       setIsEditing(false)
     } catch (err) {
@@ -157,6 +167,28 @@ export default function ProfilePage() {
     }
   }
 
+  const handleDeactivateAccount = async () => {
+    try {
+      setError(null)
+      await apiFetch<null>("/users/me/deactivate", { method: "PATCH" })
+      clearAuth()
+      router.push("/login")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không vô hiệu hóa được tài khoản")
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    try {
+      setError(null)
+      await apiFetch<null>("/users/me", { method: "DELETE" })
+      clearAuth()
+      router.push("/login")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không xóa được tài khoản")
+    }
+  }
+
   if (loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -171,7 +203,7 @@ export default function ProfilePage() {
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container mx-auto px-4 flex h-16 items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <Link href={redirectPathForRole(user.role)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="h-5 w-5" />
               <span className="hidden sm:inline">Quay lại Dashboard</span>
             </Link>
@@ -182,14 +214,16 @@ export default function ProfilePage() {
             </div>
             <span className="text-lg font-bold text-foreground">LearnHub</span>
           </Link>
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon">
+              <Settings className="h-5 w-5" />
+            </Button>
+            <LogoutButton variant="outline" className="hidden sm:inline-flex" />
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {message && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">{message}</div>}
         {error && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
         {/* Profile Header */}
@@ -330,12 +364,19 @@ export default function ProfilePage() {
                       />
                     </div>
 
-                    {isEditing && (
-                      <div className="flex justify-end">
-                        <Button onClick={handleSaveProfile}>
-                          <Save className="h-4 w-4 mr-2" />
-                          Lưu thay đổi
-                        </Button>
+                    {(isEditing || message) && (
+                      <div className="flex flex-col items-end gap-3">
+                        {message && (
+                          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                            {message}
+                          </div>
+                        )}
+                        {isEditing && (
+                          <Button onClick={handleSaveProfile}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Lưu thay đổi
+                          </Button>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -516,7 +557,7 @@ export default function ProfilePage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Hủy</AlertDialogCancel>
-                            <AlertDialogAction>Xác nhận</AlertDialogAction>
+                            <AlertDialogAction onClick={handleDeactivateAccount}>Xác nhận</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -543,7 +584,7 @@ export default function ProfilePage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Hủy</AlertDialogCancel>
-                            <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleDeleteAccount}>
                               Xóa vĩnh viễn
                             </AlertDialogAction>
                           </AlertDialogFooter>

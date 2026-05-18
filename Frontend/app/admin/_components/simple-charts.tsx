@@ -1,5 +1,5 @@
 export function SimpleBarChart({ data }: { data: { name: string; value: number }[] }) {
-  const maxValue = Math.max(...data.map((d) => d.value))
+  const maxValue = Math.max(1, ...data.map((d) => d.value))
 
   return (
     <div className="space-y-3">
@@ -22,7 +22,7 @@ export function SimpleBarChart({ data }: { data: { name: string; value: number }
 }
 
 export function SimpleLineChart({ data }: { data: { month: string; revenue: number; users: number }[] }) {
-  const maxRevenue = Math.max(...data.map((d) => d.revenue))
+  const maxRevenue = Math.max(1, ...data.map((d) => d.revenue))
 
   return (
     <div className="flex h-48 items-end gap-2">

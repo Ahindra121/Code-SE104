@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
 import { getStoredUser, redirectPathForRole } from "@/lib/auth"
+import { LogoutButton } from "@/components/logout-button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,6 +23,7 @@ import {
   GraduationCap,
   Pencil,
   Plus,
+  RotateCcw,
   Save,
   Trash2,
   Video,
@@ -41,6 +43,8 @@ type Course = {
   thumbnail_url?: string | null
   level: CourseLevel
   status: CourseStatus
+  is_deleted: boolean
+  deleted_at?: string | null
   lessons_count: number
 }
 
@@ -53,6 +57,8 @@ type Lesson = {
   order_index: number
   duration_seconds: number
   is_visible: boolean
+  is_deleted: boolean
+  deleted_at?: string | null
 }
 
 type Question = {
@@ -65,6 +71,7 @@ type Question = {
   option_d: string
   correct_option: AnswerOption
   is_active: boolean
+  deleted_at?: string | null
 }
 
 type CourseForm = {
@@ -207,7 +214,7 @@ export default function CourseEditorPage() {
 
         const [courseRes, lessonsRes] = await Promise.all([
           apiFetch<Course>(`/courses/${courseId}`),
-          apiFetch<Lesson[]>(`/lessons/course/${courseId}`),
+          apiFetch<Lesson[]>(`/lessons/course/${courseId}?include_deleted=true`),
         ])
 
         if (!alive) return
@@ -219,7 +226,7 @@ export default function CourseEditorPage() {
         const questionEntries = await Promise.all(
           lessonsRes.data.map(async (lesson) => {
             try {
-              const result = await apiFetch<Question[]>(`/questions/lesson/${lesson.id}`)
+              const result = await apiFetch<Question[]>(`/questions/lesson/${lesson.id}?include_inactive=true`)
               return [lesson.id, result.data] as const
             } catch {
               return [lesson.id, []] as const
@@ -351,15 +358,25 @@ export default function CourseEditorPage() {
     try {
       setError(null)
       await apiFetch(`/lessons/${lessonId}`, { method: "DELETE" })
-      setLessons((prev) => prev.filter((lesson) => lesson.id !== lessonId))
-      setQuestionsByLesson((prev) => {
-        const next = { ...prev }
-        delete next[lessonId]
-        return next
-      })
+      setLessons((prev) =>
+        prev.map((lesson) =>
+          lesson.id === lessonId ? { ...lesson, is_deleted: true, is_visible: false, deleted_at: new Date().toISOString() } : lesson
+        )
+      )
       setMessage("Đã ẩn bài học.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không ẩn được bài học")
+    }
+  }
+
+  async function handleRestoreLesson(lessonId: number) {
+    try {
+      setError(null)
+      const result = await apiFetch<Lesson>(`/lessons/${lessonId}/restore`, { method: "PATCH" })
+      setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? result.data : lesson)))
+      setMessage("Đã khôi phục bài học.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không khôi phục được bài học")
     }
   }
 
@@ -457,11 +474,29 @@ export default function CourseEditorPage() {
       await apiFetch(`/questions/${question.id}`, { method: "DELETE" })
       setQuestionsByLesson((prev) => ({
         ...prev,
-        [question.lesson_id]: (prev[question.lesson_id] ?? []).filter((item) => item.id !== question.id),
+        [question.lesson_id]: (prev[question.lesson_id] ?? []).map((item) =>
+          item.id === question.id ? { ...item, is_active: false, deleted_at: new Date().toISOString() } : item
+        ),
       }))
       setMessage("Đã ẩn câu hỏi.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không ẩn được câu hỏi")
+    }
+  }
+
+  async function handleRestoreQuestion(question: Question) {
+    try {
+      setError(null)
+      const result = await apiFetch<Question>(`/questions/${question.id}/restore`, { method: "PATCH" })
+      setQuestionsByLesson((prev) => ({
+        ...prev,
+        [question.lesson_id]: (prev[question.lesson_id] ?? []).map((item) =>
+          item.id === question.id ? result.data : item
+        ),
+      }))
+      setMessage("Đã khôi phục câu hỏi.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không khôi phục được câu hỏi")
     }
   }
 
@@ -547,10 +582,16 @@ export default function CourseEditorPage() {
             </div>
           </div>
 
-          <Button size="sm" onClick={handleSaveCourse} disabled={savingCourse}>
-            <Save className="mr-2 h-4 w-4" />
-            {savingCourse ? "Đang lưu..." : "Lưu khóa học"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <LogoutButton
+              variant="outline"
+              className="hidden border-border bg-background text-foreground hover:bg-muted hover:text-foreground sm:inline-flex"
+            />
+            <Button size="sm" onClick={handleSaveCourse} disabled={savingCourse}>
+              <Save className="mr-2 h-4 w-4" />
+              {savingCourse ? "Đang lưu..." : "Lưu khóa học"}
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -775,19 +816,28 @@ export default function CourseEditorPage() {
                             Bài {lesson.order_index}: {lesson.title}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {Math.round(lesson.duration_seconds / 60)} phút • {lesson.is_visible ? "Đang hiển thị" : "Đã ẩn"}
+                            {Math.round(lesson.duration_seconds / 60)} phút • {lesson.is_deleted ? "Đã ẩn, có thể khôi phục trong 30 ngày" : lesson.is_visible ? "Đang hiển thị" : "Đã ẩn"}
                           </p>
                         </div>
                       </div>
                           <div className="flex items-center gap-2 self-end sm:self-center">
-                            <Button variant="outline" size="sm" onClick={() => startEditLesson(lesson)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Sửa
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Ẩn
-                            </Button>
+                            {lesson.is_deleted ? (
+                              <Button variant="outline" size="sm" onClick={() => handleRestoreLesson(lesson.id)}>
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                Khôi phục
+                              </Button>
+                            ) : (
+                              <>
+                                <Button variant="outline" size="sm" onClick={() => startEditLesson(lesson)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Sửa
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Ẩn
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -939,15 +989,26 @@ export default function CourseEditorPage() {
                                 <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <p className="font-medium text-foreground">{question.content}</p>
-                                  <p className="mt-1 text-sm text-muted-foreground">Đáp án đúng: {question.correct_option}</p>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Đáp án đúng: {question.correct_option}
+                                    {!question.is_active ? " • Đã ẩn, có thể khôi phục trong 30 ngày" : ""}
+                                  </p>
                                 </div>
                                   <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => startEditQuestion(question)}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteQuestion(question)}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    {!question.is_active ? (
+                                      <Button variant="outline" size="sm" onClick={() => handleRestoreQuestion(question)}>
+                                        <RotateCcw className="h-4 w-4" />
+                                      </Button>
+                                    ) : (
+                                      <>
+                                        <Button variant="outline" size="sm" onClick={() => startEditQuestion(question)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteQuestion(question)}>
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    )}
                                   </div>
                               </div>
                               )}

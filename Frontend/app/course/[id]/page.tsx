@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { apiFetch } from "@/lib/api"
-import { clearAuth, getStoredToken, getStoredUser, LearnHubUser } from "@/lib/auth"
+import { clearAuth, getStoredToken, getStoredUser, LearnHubUser, redirectPathForRole } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -64,6 +64,7 @@ type CourseProgress = {
   completed_lessons: number
   total_lessons: number
   percent: number
+  completed_lesson_ids: number[]
 }
 
 type Review = {
@@ -92,12 +93,14 @@ function instructorName(course: Course) {
 export default function CourseDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const courseId = Number(params.id)
 
   const [course, setCourse] = useState<Course | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [progress, setProgress] = useState<CourseProgress | null>(null)
+  const [viewer, setViewer] = useState<LearnHubUser | null>(null)
   const [isEnrolled, setIsEnrolled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -135,7 +138,14 @@ export default function CourseDetailPage() {
           return
         }
 
-        if (user.role !== "student") return
+        setViewer(user)
+
+        if (user.role !== "student") {
+          const lessonsRes = await apiFetch<Lesson[]>(`/lessons/course/${courseId}`)
+          if (!alive) return
+          setLessons(lessonsRes.data)
+          return
+        }
 
         const enrollmentsRes = await apiFetch<Enrollment[]>("/enrollments/mine")
         if (!alive) return
@@ -172,6 +182,12 @@ export default function CourseDetailPage() {
       alive = false
     }
   }, [courseId])
+
+  function safeReturnPath() {
+    const value = searchParams.get("returnTo")
+    if (value?.startsWith("/") && !value.startsWith("//")) return value
+    return viewer ? redirectPathForRole(viewer.role) : "/search"
+  }
 
   async function handleEnroll() {
     if (!getStoredToken() || !getStoredUser()) {
@@ -251,6 +267,8 @@ export default function CourseDetailPage() {
   const percent = progress?.percent ?? 0
   const completedLessons = progress?.completed_lessons ?? 0
   const totalLessons = progress?.total_lessons ?? course.lessons_count
+  const canViewLessons = isEnrolled || viewer?.role === "admin" || viewer?.role === "instructor"
+  const homeHref = viewer ? redirectPathForRole(viewer.role) : "/"
 
   return (
     <div className="min-h-screen bg-background">
@@ -258,11 +276,11 @@ export default function CourseDetailPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
-              <Link href="/search">
+              <Link href={safeReturnPath()}>
                 <ChevronLeft className="h-5 w-5" />
               </Link>
             </Button>
-            <Link href="/" className="flex items-center gap-2">
+            <Link href={homeHref} className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
                 <GraduationCap className="h-5 w-5 text-primary-foreground" />
               </div>
@@ -270,7 +288,7 @@ export default function CourseDetailPage() {
             </Link>
           </div>
 
-          {isEnrolled ? (
+          {canViewLessons ? (
             <Button asChild disabled={!firstLesson}>
               <Link href={firstLesson ? `/course/${course.id}/lesson/${firstLesson.id}` : `/course/${course.id}`}>
                 <Play className="mr-2 h-4 w-4" /> Tiếp tục học
@@ -336,9 +354,9 @@ export default function CourseDetailPage() {
               />
             </div>
             <CardContent className="p-6">
-              {isEnrolled ? (
+              {canViewLessons ? (
                 <>
-                  <div className="mb-4">
+                  {isEnrolled && <div className="mb-4">
                     <div className="mb-2 flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Tiến độ của bạn</span>
                       <span className="font-medium">{percent}%</span>
@@ -347,13 +365,13 @@ export default function CourseDetailPage() {
                     <p className="mt-2 text-sm text-muted-foreground">
                       {completedLessons}/{totalLessons} bài học đã hoàn thành
                     </p>
-                  </div>
+                  </div>}
                   <Button className="w-full" size="lg" asChild disabled={!firstLesson}>
                     <Link href={firstLesson ? `/course/${course.id}/lesson/${firstLesson.id}` : `/course/${course.id}`}>
                       <Play className="mr-2 h-4 w-4" /> Vào học
                     </Link>
                   </Button>
-                  {percent >= 100 && (
+                  {isEnrolled && percent >= 100 && (
                     <Button
                       className="mt-3 w-full"
                       variant="outline"
@@ -405,7 +423,7 @@ export default function CourseDetailPage() {
                 <CardTitle>Nội dung khóa học</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {!isEnrolled ? (
+                {!canViewLessons ? (
                   <div className="rounded-lg border border-dashed p-8 text-center">
                     <p className="text-muted-foreground">Đăng ký khóa học để xem danh sách bài học.</p>
                     <Button className="mt-4" onClick={handleEnroll} disabled={actionLoading}>
@@ -417,22 +435,31 @@ export default function CourseDetailPage() {
                     Khóa học chưa có bài học.
                   </p>
                 ) : (
-                  lessons.map((lesson) => (
+                  lessons.map((lesson) => {
+                    const isCompleted = progress?.completed_lesson_ids?.includes(lesson.id)
+                    return (
                     <Link
                       key={lesson.id}
                       href={`/course/${course.id}/lesson/${lesson.id}`}
                       className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-muted"
                     >
                       <div className="flex items-center gap-3">
-                        <Play className="h-5 w-5 text-primary" />
+                        {isCompleted ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <Play className="h-5 w-5 text-primary" />
+                        )}
                         <div>
                           <p className="font-medium text-foreground">{lesson.title}</p>
-                          <p className="text-sm text-muted-foreground">Bài {lesson.order_index}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Bài {lesson.order_index}{isCompleted ? " • Đã hoàn thành" : ""}
+                          </p>
                         </div>
                       </div>
                       <span className="text-sm text-muted-foreground">{formatDuration(lesson.duration_seconds)}</span>
                     </Link>
-                  ))
+                    )
+                  })
                 )}
               </CardContent>
             </Card>

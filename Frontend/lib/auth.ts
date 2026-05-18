@@ -3,8 +3,13 @@ export type LearnHubUser = {
   email: string
   username: string
   full_name?: string | null
+  phone?: string | null
+  bio?: string | null
   role: "student" | "instructor" | "admin"
   is_active: boolean
+  deleted_at?: string | null
+  admin_locked_at?: string | null
+  admin_locked_reason?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -25,6 +30,11 @@ export function saveAuth(token: string, user: LearnHubUser) {
   localStorage.removeItem(USER_KEY)
   localStorage.removeItem(LEGACY_DEMO_KEY)
   sessionStorage.setItem(TOKEN_KEY, token)
+  sessionStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function updateStoredUser(user: LearnHubUser) {
+  if (!getStoredToken()) return
   sessionStorage.setItem(USER_KEY, JSON.stringify(user))
 }
 

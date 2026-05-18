@@ -306,7 +306,7 @@ export default function CertificatesPage() {
 
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1" asChild>
-                      <Link href={`/course/${cert.course_id}`}>
+                      <Link href={`/course/${cert.course_id}?returnTo=/certificates`}>
                         <ExternalLink className="mr-2 h-4 w-4" />
                         Khóa học
                       </Link>

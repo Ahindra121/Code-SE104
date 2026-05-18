@@ -26,6 +26,18 @@ class UserRole(str, enum.Enum):
     admin = "admin"
 
 
+class ReactivationRequestStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
+class CourseDeletionRequestStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
 class CourseLevel(str, enum.Enum):
     basic = "basic"
     intermediate = "intermediate"
@@ -69,9 +81,13 @@ class User(Base, TimestampMixin):
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(30))
+    bio: Mapped[str | None] = mapped_column(Text)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False, default=UserRole.student)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    admin_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    admin_locked_reason: Mapped[str | None] = mapped_column(Text)
 
     courses: Mapped[list["Course"]] = relationship(back_populates="instructor")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
@@ -79,6 +95,28 @@ class User(Base, TimestampMixin):
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(back_populates="student")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="student")
     reviews: Mapped[list["Review"]] = relationship(back_populates="student")
+    reactivation_requests: Mapped[list["ReactivationRequest"]] = relationship(
+        back_populates="user", foreign_keys="ReactivationRequest.user_id", cascade="all, delete-orphan"
+    )
+
+
+class ReactivationRequest(Base, TimestampMixin):
+    __tablename__ = "reactivation_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[ReactivationRequestStatus] = mapped_column(
+        Enum(ReactivationRequestStatus, name="reactivation_request_status"),
+        nullable=False,
+        default=ReactivationRequestStatus.pending,
+    )
+    admin_response: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship(back_populates="reactivation_requests", foreign_keys=[user_id])
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
 
 
 class Course(Base, TimestampMixin):
@@ -96,6 +134,7 @@ class Course(Base, TimestampMixin):
     )
     instructor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
 
     instructor: Mapped[User] = relationship(back_populates="courses")
@@ -105,6 +144,31 @@ class Course(Base, TimestampMixin):
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(back_populates="course")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="course")
     reviews: Mapped[list["Review"]] = relationship(back_populates="course")
+    deletion_requests: Mapped[list["CourseDeletionRequest"]] = relationship(
+        back_populates="course", cascade="all, delete-orphan"
+    )
+
+
+class CourseDeletionRequest(Base, TimestampMixin):
+    __tablename__ = "course_deletion_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    instructor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    student_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[CourseDeletionRequestStatus] = mapped_column(
+        Enum(CourseDeletionRequestStatus, name="course_deletion_request_status"),
+        nullable=False,
+        default=CourseDeletionRequestStatus.pending,
+    )
+    admin_response: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    course: Mapped[Course] = relationship(back_populates="deletion_requests")
+    instructor: Mapped[User] = relationship(foreign_keys=[instructor_id])
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
 
 
 class Lesson(Base, TimestampMixin):
@@ -120,6 +184,7 @@ class Lesson(Base, TimestampMixin):
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     course: Mapped[Course] = relationship(back_populates="lessons")
     progress_records: Mapped[list["LearningProgress"]] = relationship(back_populates="lesson")
@@ -152,6 +217,7 @@ class LearningProgress(Base):
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False)
     watched_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    document_viewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -172,6 +238,7 @@ class Question(Base, TimestampMixin):
     option_d: Mapped[str] = mapped_column(String(500), nullable=False)
     correct_option: Mapped[AnswerOption] = mapped_column(Enum(AnswerOption, name="answer_option"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     lesson: Mapped[Lesson] = relationship(back_populates="questions")
     answers: Mapped[list["QuizAnswer"]] = relationship(back_populates="question")

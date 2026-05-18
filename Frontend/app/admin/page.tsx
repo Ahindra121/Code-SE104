@@ -223,7 +223,7 @@ export default function AdminDashboard() {
                           {new Date(course.updated_at).toLocaleDateString("vi-VN")}
                         </span>
                         <Button size="sm" asChild>
-                          <Link href="/admin/courses">Duyệt</Link>
+                          <Link href={`/course/${course.id}?returnTo=/admin`}>Xem chi tiết</Link>
                         </Button>
                       </div>
                     </div>

@@ -8,7 +8,7 @@ import { getStoredUser } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, CheckCircle2, FileText, PlayCircle } from "lucide-react"
+import { ArrowLeft, FileText, PlayCircle } from "lucide-react"
 
 type Lesson = {
   id: number
@@ -31,7 +31,11 @@ type Question = {
   id: number
   lesson_id: number
   content: string
-  options: Record<"A" | "B" | "C" | "D", string>
+  options?: Record<"A" | "B" | "C" | "D", string>
+  option_a?: string
+  option_b?: string
+  option_c?: string
+  option_d?: string
 }
 
 type QuizAttempt = {
@@ -44,6 +48,7 @@ type QuizAttempt = {
 
 type ProgressOut = {
   watched_seconds: number
+  document_viewed: boolean
   is_completed: boolean
 }
 
@@ -61,6 +66,7 @@ export default function LessonPage() {
   const [course, setCourse] = useState<Course | null>(null)
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
+  const [viewerRole, setViewerRole] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<number, "A" | "B" | "C" | "D">>({})
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null)
   const [loading, setLoading] = useState(true)
@@ -70,10 +76,12 @@ export default function LessonPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!getStoredUser()) {
+    const user = getStoredUser()
+    if (!user) {
       router.push("/login")
       return
     }
+    setViewerRole(user.role)
 
     let alive = true
 
@@ -91,7 +99,17 @@ export default function LessonPage() {
         if (!alive) return
         setCourse(courseRes.data)
         setLesson(lessonRes.data)
-        setQuestions(questionsRes.data)
+        setQuestions(
+          questionsRes.data.map((question) => ({
+            ...question,
+            options: question.options ?? {
+              A: question.option_a ?? "",
+              B: question.option_b ?? "",
+              C: question.option_c ?? "",
+              D: question.option_d ?? "",
+            },
+          }))
+        )
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Không tải được bài học")
       } finally {
@@ -111,23 +129,30 @@ export default function LessonPage() {
     }
   }, [courseId, lessonId, router])
 
-  async function handleCompleteLesson() {
+  async function handleViewContent() {
     if (!lesson) return
+    if (lesson.document_url) {
+      window.open(lesson.document_url, "_blank", "noopener,noreferrer")
+    }
+    const watchedSeconds = lesson.duration_seconds > 0 ? Math.ceil(lesson.duration_seconds * 0.9) : 1
 
     try {
       setSavingProgress(true)
       setMessage(null)
       setError(null)
 
-      const watchedSeconds = lesson.duration_seconds > 0 ? lesson.duration_seconds : 1
-      const result = await apiFetch<ProgressOut>("/progress", {
+      await apiFetch<ProgressOut>("/progress", {
         method: "POST",
-        body: JSON.stringify({ lesson_id: lesson.id, watched_seconds: watchedSeconds }),
+        body: JSON.stringify({
+          lesson_id: lesson.id,
+          watched_seconds: watchedSeconds,
+          document_viewed: true,
+        }),
       })
 
-      setMessage(result.data.is_completed ? "Đã ghi nhận hoàn thành bài học." : "Đã cập nhật tiến độ học.")
+      setMessage("Đã ghi nhận bạn xem đủ 90% nội dung. Bài học sẽ tự hoàn thành khi quiz đạt từ 50%.")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không cập nhật được tiến độ")
+      setError(err instanceof Error ? err.message : "Không ghi nhận được trạng thái xem nội dung")
     } finally {
       setSavingProgress(false)
     }
@@ -155,7 +180,11 @@ export default function LessonPage() {
       })
 
       setAttempt(result.data)
-      setMessage(result.data.passed ? "Bạn đã vượt qua quiz." : "Bạn chưa đạt quiz, hãy ôn lại bài và thử lại.")
+      setMessage(
+        result.data.passed
+          ? "Bạn đã đạt quiz. Nếu đã xem đủ nội dung, hệ thống đã tự đánh dấu hoàn thành bài học."
+          : "Bạn chưa đạt quiz, hãy ôn lại bài và thử lại."
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không nộp được quiz")
     } finally {
@@ -188,6 +217,8 @@ export default function LessonPage() {
 
   const answeredCount = Object.keys(answers).length
   const quizReady = questions.length > 0 && answeredCount === questions.length
+  const canStudy = viewerRole === "student"
+  const hasLearningContent = Boolean(lesson.video_url || lesson.document_url)
 
   return (
     <div className="min-h-screen bg-background">
@@ -229,17 +260,27 @@ export default function LessonPage() {
               </div>
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <Button onClick={handleCompleteLesson} disabled={savingProgress}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {savingProgress ? "Đang lưu..." : "Đánh dấu hoàn thành"}
-                </Button>
-                {lesson.document_url && (
-                  <Button variant="outline" asChild>
-                    <a href={lesson.document_url} target="_blank" rel="noreferrer">
+                {hasLearningContent && (
+                  canStudy ? (
+                    <Button variant="outline" onClick={handleViewContent} disabled={savingProgress}>
                       <FileText className="mr-2 h-4 w-4" />
-                      Mở tài liệu
-                    </a>
-                  </Button>
+                      {savingProgress ? "Đang ghi nhận..." : lesson.document_url ? "Mở tài liệu" : "Ghi nhận đã xem 90%"}
+                    </Button>
+                  ) : (
+                    lesson.document_url && (
+                      <Button variant="outline" asChild>
+                        <a href={lesson.document_url} target="_blank" rel="noreferrer">
+                          <FileText className="mr-2 h-4 w-4" />
+                          Mở tài liệu
+                        </a>
+                      </Button>
+                    )
+                  )
+                )}
+                {!hasLearningContent && (
+                  <p className="text-sm text-muted-foreground">
+                    Bài học này không có video hoặc tài liệu; hệ thống sẽ hoàn thành bài khi quiz đạt từ 50%.
+                  </p>
                 )}
               </div>
 
@@ -290,16 +331,16 @@ export default function LessonPage() {
                             className="mt-1"
                           />
                           <span>
-                            <strong>{option}.</strong> {question.options[option]}
+                            <strong>{option}.</strong> {question.options?.[option]}
                           </span>
                         </label>
                       ))}
                     </div>
                   ))}
 
-                  <Button className="w-full" onClick={handleSubmitQuiz} disabled={!quizReady || submittingQuiz}>
+                  {canStudy && <Button className="w-full" onClick={handleSubmitQuiz} disabled={!quizReady || submittingQuiz}>
                     {submittingQuiz ? "Đang nộp..." : "Nộp quiz"}
-                  </Button>
+                  </Button>}
 
                   {attempt && (
                     <div className="rounded-lg bg-muted/50 p-4 text-sm">

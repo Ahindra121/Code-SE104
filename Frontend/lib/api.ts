@@ -8,6 +8,18 @@ export type ApiResponse<T> = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api"
 
+function getErrorMessage(result: any) {
+  if (typeof result?.message === "string") return result.message
+  if (typeof result?.detail === "string") return result.detail
+  if (Array.isArray(result?.detail)) {
+    return result.detail
+      .map((item: any) => item?.msg)
+      .filter(Boolean)
+      .join(". ")
+  }
+  return "Có lỗi xảy ra"
+}
+
 export class ApiError extends Error {
   status: number
   data: unknown
@@ -32,10 +44,19 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     headers.set("Authorization", `Bearer ${token}`)
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  })
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    })
+  } catch (error) {
+    throw new ApiError(
+      "Không kết nối được máy chủ. Vui lòng kiểm tra backend đang chạy và cấu hình NEXT_PUBLIC_API_URL.",
+      0,
+      error
+    )
+  }
 
   const result = await response.json().catch(() => ({
     success: false,
@@ -44,7 +65,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }))
 
   if (!response.ok || !result.success) {
-    throw new ApiError(result.message ?? "Có lỗi xảy ra", response.status, result)
+    throw new ApiError(getErrorMessage(result), response.status, result)
   }
 
   return result

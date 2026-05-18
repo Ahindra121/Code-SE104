@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,6 +12,19 @@ from app.schemas.lesson import LessonCreate, LessonOut, LessonUpdate
 from app.services.course_service import assert_course_owner
 
 router = APIRouter(prefix="/lessons", tags=["Lessons"])
+CONTENT_RESTORE_DAYS = 30
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _can_restore(deleted_at: datetime | None) -> bool:
+    if deleted_at is None:
+        return True
+    if deleted_at.tzinfo is None:
+        deleted_at = deleted_at.replace(tzinfo=UTC)
+    return deleted_at >= _now() - timedelta(days=CONTENT_RESTORE_DAYS)
 
 
 def can_access_lesson(db: Session, user: User, lesson: Lesson) -> bool:
@@ -28,12 +43,42 @@ def can_access_lesson(db: Session, user: User, lesson: Lesson) -> bool:
     )
 
 
+def is_enrolled_in_course(db: Session, user: User, course_id: int) -> bool:
+    return bool(
+        db.scalar(
+            select(Enrollment).where(
+                Enrollment.student_id == user.id,
+                Enrollment.course_id == course_id,
+                Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
+            )
+        )
+    )
+
+
 @router.get("/course/{course_id}")
-def list_lessons(course_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_lessons(
+    course_id: int,
+    include_deleted: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     course = db.get(Course, course_id)
-    if not course or course.is_deleted:
+    if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    lessons = db.scalars(select(Lesson).where(Lesson.course_id == course_id, Lesson.is_deleted.is_(False)).order_by(Lesson.order_index)).all()
+    if course.is_deleted:
+        can_view_deleted = (
+            current_user.role == UserRole.admin
+            or (current_user.role == UserRole.instructor and course.instructor_id == current_user.id)
+            or (current_user.role == UserRole.student and is_enrolled_in_course(db, current_user, course_id))
+        )
+        if not can_view_deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if current_user.role == UserRole.instructor and course.instructor_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn chỉ có thể quản lý khóa học của mình")
+    filters = [Lesson.course_id == course_id]
+    if not (include_deleted and current_user.role == UserRole.instructor):
+        filters.append(Lesson.is_deleted.is_(False))
+    lessons = db.scalars(select(Lesson).where(*filters).order_by(Lesson.order_index)).all()
     if current_user.role == UserRole.student:
         enrolled = db.scalar(
             select(Enrollment).where(
@@ -64,7 +109,9 @@ def create_lesson(payload: LessonCreate, db: Session = Depends(get_db), current_
 @router.get("/{lesson_id}")
 def get_lesson(lesson_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     lesson = db.get(Lesson, lesson_id)
-    if not lesson or lesson.is_deleted or not lesson.course or lesson.course.is_deleted:
+    if not lesson or lesson.is_deleted or not lesson.course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+    if lesson.course.is_deleted and not can_access_lesson(db, current_user, lesson):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
     if not can_access_lesson(db, current_user, lesson):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Enrollment required")
@@ -97,5 +144,24 @@ def soft_delete_lesson(lesson_id: int, db: Session = Depends(get_db), current_us
     assert_course_owner(lesson.course, current_user)
     lesson.is_deleted = True
     lesson.is_visible = False
+    lesson.deleted_at = _now()
     db.commit()
-    return ok(None, "Lesson hidden")
+    return ok(None, "Đã ẩn bài học")
+
+
+@router.patch("/{lesson_id}/restore")
+def restore_lesson(lesson_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.instructor))):
+    lesson = db.get(Lesson, lesson_id)
+    if not lesson:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy bài học")
+    assert_course_owner(lesson.course, current_user)
+    if not lesson.is_deleted:
+        return ok(LessonOut.model_validate(lesson), "Bài học đang hoạt động")
+    if not _can_restore(lesson.deleted_at):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bài học đã quá thời hạn khôi phục")
+    lesson.is_deleted = False
+    lesson.deleted_at = None
+    lesson.is_visible = True
+    db.commit()
+    db.refresh(lesson)
+    return ok(LessonOut.model_validate(lesson), "Đã khôi phục bài học")

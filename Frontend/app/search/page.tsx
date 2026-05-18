@@ -39,6 +39,7 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { apiFetch } from "@/lib/api"
+import { getStoredUser, redirectPathForRole } from "@/lib/auth"
 
 type BackendCourse = {
   id: number
@@ -281,6 +282,8 @@ function mapBackendCourse(course: BackendCourse) {
 
 export default function SearchPage() {
   const [courses, setCourses] = useState(allCourses)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [homeHref, setHomeHref] = useState("/")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedLevels, setSelectedLevels] = useState<string[]>([])
@@ -292,6 +295,9 @@ export default function SearchPage() {
   const pageSize = 6
 
   useEffect(() => {
+    const user = getStoredUser()
+    setIsLoggedIn(Boolean(user))
+    setHomeHref(user ? redirectPathForRole(user.role) : "/")
     apiFetch<{ items: BackendCourse[]; total: number; page: number; page_size: number }>("/courses?page_size=100")
       .then((result) => setCourses(result.data.items.map(mapBackendCourse)))
       .catch(() => setCourses(allCourses))
@@ -387,7 +393,6 @@ export default function SearchPage() {
 
   const activeFiltersCount =
     selectedCategories.length + selectedLevels.length + (minRating > 0 ? 1 : 0) + (priceRange[0] > 0 || priceRange[1] < 3000000 ? 1 : 0)
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("vi-VN").format(price) + "đ"
   }
@@ -488,7 +493,7 @@ export default function SearchPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container mx-auto px-4 flex h-16 items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 shrink-0">
+          <Link href={homeHref} className="flex items-center gap-2 shrink-0">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
@@ -508,7 +513,7 @@ export default function SearchPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={`flex items-center gap-2 shrink-0 ${isLoggedIn ? "hidden" : ""}`}>
             <Link href="/login">
               <Button variant="ghost" size="sm">Đăng nhập</Button>
             </Link>
@@ -636,7 +641,7 @@ export default function SearchPage() {
             ) : viewMode === "grid" ? (
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {paginatedCourses.map((course) => (
-                  <Link key={course.id} href={`/course/${course.id}`}>
+                  <Link key={course.id} href={`/course/${course.id}?returnTo=/search`}>
                     <Card className="overflow-hidden h-full group hover:shadow-lg transition-shadow">
                       <div className="relative">
                         <img
@@ -686,7 +691,7 @@ export default function SearchPage() {
             ) : (
               <div className="space-y-4">
                 {paginatedCourses.map((course) => (
-                  <Link key={course.id} href={`/course/${course.id}`}>
+                  <Link key={course.id} href={`/course/${course.id}?returnTo=/search`}>
                     <Card className="overflow-hidden group hover:shadow-lg transition-shadow">
                       <div className="flex flex-col md:flex-row">
                         <div className="relative md:w-64 shrink-0">

@@ -30,6 +30,7 @@ def course_to_out(db: Session, course: Course) -> CourseOut:
         status=course.status,
         instructor_id=course.instructor_id,
         is_deleted=course.is_deleted,
+        deleted_at=course.deleted_at,
         rejection_reason=course.rejection_reason,
         created_at=course.created_at,
         updated_at=course.updated_at,
@@ -45,4 +46,4 @@ def assert_course_owner(course: Course, user: User) -> None:
     from fastapi import HTTPException, status
 
     if course.instructor_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only manage your own courses")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn chỉ có thể quản lý khóa học của mình")

@@ -219,7 +219,7 @@ export default function AdminCoursesPage() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="outline" size="sm" className="gap-1" asChild>
-                        <Link href={`/course/${course.id}`}>
+                        <Link href={`/course/${course.id}?returnTo=/admin/courses`}>
                           <Eye className="h-4 w-4" /> Xem trước
                         </Link>
                       </Button>
@@ -268,7 +268,7 @@ export default function AdminCoursesPage() {
                   {course.rejection_reason && <p className="mt-1 text-sm text-destructive">Lý do từ chối: {course.rejection_reason}</p>}
                 </div>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/course/${course.id}`}>Xem</Link>
+                  <Link href={`/course/${course.id}?returnTo=/admin/courses`}>Xem</Link>
                 </Button>
               </div>
             ))}

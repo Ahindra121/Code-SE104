@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
 import { getStoredUser, redirectPathForRole, roleLabel } from "@/lib/auth"
+import { LogoutButton } from "@/components/logout-button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,9 @@ type Course = {
   thumbnail_url?: string | null
   level: string
   status: CourseStatus
+  is_deleted: boolean
+  deleted_at?: string | null
+  rejection_reason?: string | null
   rating: number
   reviews_count: number
   students_count: number
@@ -83,6 +87,7 @@ export default function InstructorCoursesPage() {
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -142,6 +147,41 @@ export default function InstructorCoursesPage() {
     }
   }
 
+  async function handleArchiveCourse(course: Course) {
+    let reason: string | null = null
+    if (course.students_count > 0) {
+      reason = window.prompt(
+        "Khóa học đang có học viên. Nhập lý do để gửi admin duyệt yêu cầu lưu trữ/xóa:",
+        "Cần ngừng khai thác khóa học nhưng vẫn đảm bảo quyền lợi học viên hiện tại."
+      )?.trim() || null
+      if (!reason) return
+    } else if (!window.confirm("Ẩn/lưu trữ khóa học này?")) {
+      return
+    }
+
+    try {
+      setDeletingId(course.id)
+      setError(null)
+      setMessage(null)
+      await apiFetch(`/courses/${course.id}`, {
+        method: "DELETE",
+        body: reason ? JSON.stringify({ reason }) : undefined,
+      })
+      if (reason) {
+        setMessage("Đã gửi yêu cầu lưu trữ/xóa khóa học cho admin duyệt.")
+      } else {
+        setCourses((prev) =>
+          prev.map((item) => (item.id === course.id ? { ...item, status: "archived" } : item))
+        )
+        setMessage("Đã lưu trữ khóa học.")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể xử lý yêu cầu lưu trữ/xóa khóa học")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   if (!auth || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -153,6 +193,21 @@ export default function InstructorCoursesPage() {
   const approvedCourses = courses.filter((course) => course.status === "approved").length
   const draftCourses = courses.filter((course) => course.status === "draft").length
   const pendingCourses = courses.filter((course) => course.status === "pending").length
+
+  async function handleRestoreCourse(course: Course) {
+    try {
+      setDeletingId(course.id)
+      setError(null)
+      setMessage(null)
+      const result = await apiFetch<Course>(`/courses/${course.id}/restore`, { method: "PATCH" })
+      setCourses((prev) => prev.map((item) => (item.id === course.id ? result.data : item)))
+      setMessage("Đã khôi phục khóa học. Khóa học được đưa về bản nháp để bạn kiểm tra trước khi gửi duyệt lại.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không khôi phục được khóa học")
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -194,6 +249,10 @@ export default function InstructorCoursesPage() {
           </nav>
 
           <div className="border-t border-sidebar-border p-4">
+            <LogoutButton
+              variant="outline"
+              className="mb-3 w-full justify-start border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground"
+            />
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src="" />
@@ -236,6 +295,7 @@ export default function InstructorCoursesPage() {
           </div>
 
           {error && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
+          {message && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">{message}</div>}
 
           <div className="mb-8 grid gap-4 md:grid-cols-3">
             <Card>
@@ -300,6 +360,12 @@ export default function InstructorCoursesPage() {
                               Cập nhật {new Date(course.updated_at).toLocaleDateString("vi-VN")} • {course.category} • {course.level}
                             </p>
 
+                            {course.status === "rejected" && course.rejection_reason && (
+                              <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-sm text-destructive">
+                                Lý do từ chối: {course.rejection_reason}
+                              </p>
+                            )}
+
                             <div className="mt-4 grid gap-3 sm:grid-cols-4">
                               <div>
                                 <p className="text-xs uppercase text-muted-foreground">Học viên</p>
@@ -341,11 +407,21 @@ export default function InstructorCoursesPage() {
                             variant="ghost"
                             size="icon"
                             className="h-9 w-9 text-destructive hover:text-destructive"
-                            onClick={() => handleArchive(course.id)}
+                            onClick={() => handleArchiveCourse(course)}
                             disabled={deletingId === course.id || course.status === "archived"}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+                          {(course.is_deleted || course.status === "archived") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRestoreCourse(course)}
+                              disabled={deletingId === course.id}
+                            >
+                              Khôi phục
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

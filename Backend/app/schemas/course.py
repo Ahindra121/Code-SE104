@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.entities import CourseLevel, CourseStatus
+from app.models.entities import CourseDeletionRequestStatus, CourseLevel, CourseStatus
 from app.schemas.user import UserOut
 
 
@@ -34,6 +34,43 @@ class CourseModeration(BaseModel):
     rejection_reason: str | None = None
 
 
+class CourseDeletionRequestCreate(BaseModel):
+    reason: str = Field(..., min_length=10, max_length=2000)
+
+
+class CourseDeletionReview(BaseModel):
+    response: str | None = Field(default=None, max_length=2000)
+
+
+class CourseDeletionCourseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    category: str
+    status: CourseStatus
+    instructor_id: int
+    is_deleted: bool
+
+
+class CourseDeletionRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    course_id: int
+    instructor_id: int
+    reason: str
+    student_count: int
+    status: CourseDeletionRequestStatus
+    admin_response: str | None
+    reviewed_by_id: int | None
+    reviewed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    course: CourseDeletionCourseOut
+    instructor: UserOut | None = None
+
+
 class CourseOut(CourseBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,6 +78,7 @@ class CourseOut(CourseBase):
     status: CourseStatus
     instructor_id: int
     is_deleted: bool
+    deleted_at: datetime | None
     rejection_reason: str | None
     created_at: datetime
     updated_at: datetime

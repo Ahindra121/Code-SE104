@@ -5,7 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ProgressUpdate(BaseModel):
     lesson_id: int
-    watched_seconds: int = Field(..., ge=0)
+    watched_seconds: int = Field(default=0, ge=0)
+    document_viewed: bool = False
 
 
 class ProgressOut(BaseModel):
@@ -16,6 +17,7 @@ class ProgressOut(BaseModel):
     course_id: int
     lesson_id: int
     watched_seconds: int
+    document_viewed: bool
     is_completed: bool
     completed_at: datetime | None
 
@@ -25,3 +27,4 @@ class CourseProgressOut(BaseModel):
     completed_lessons: int
     total_lessons: int
     percent: float
+    completed_lesson_ids: list[int] = []

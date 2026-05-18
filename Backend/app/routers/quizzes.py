@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import require_roles
-from app.models.entities import Enrollment, EnrollmentStatus, Lesson, Question, QuizAnswer, QuizAttempt, User, UserRole
+from app.models.entities import Enrollment, EnrollmentStatus, LearningProgress, Lesson, Question, QuizAnswer, QuizAttempt, User, UserRole
+from app.routers.progress import sync_lesson_completion
 from app.schemas.common import ok
 from app.schemas.quiz import QuizAttemptOut, QuizSubmit
 
@@ -54,6 +55,23 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
                     is_correct=selected == question.correct_option,
                 )
             )
+    progress = db.scalar(
+        select(LearningProgress).where(
+            LearningProgress.student_id == current_user.id,
+            LearningProgress.lesson_id == lesson.id,
+        )
+    )
+    if not progress:
+        progress = LearningProgress(
+            student_id=current_user.id,
+            course_id=lesson.course_id,
+            lesson_id=lesson.id,
+            watched_seconds=0,
+            document_viewed=False,
+            is_completed=False,
+        )
+        db.add(progress)
+    sync_lesson_completion(db, progress, lesson)
     db.commit()
     db.refresh(attempt)
     return ok(QuizAttemptOut.model_validate(attempt), "Quiz submitted")

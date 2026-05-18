@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { GraduationCap, Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react"
 import { apiFetch } from "@/lib/api"
 import { LearnHubUser, redirectPathForRole, saveAuth } from "@/lib/auth"
@@ -16,6 +17,9 @@ export default function LoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [reactivationMessage, setReactivationMessage] = useState<string | null>(null)
+  const [reactivationReason, setReactivationReason] = useState("")
+  const [showReactivationOptions, setShowReactivationOptions] = useState(false)
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -44,6 +48,7 @@ export default function LoginPage() {
     if (!validateForm()) return
 
     setIsLoading(true)
+    setReactivationMessage(null)
 
     try {
       const result = await apiFetch<{
@@ -62,6 +67,84 @@ export default function LoginPage() {
       router.push(redirectPathForRole(result.data.user.role))
     } catch (error) {
       const message = error instanceof Error ? error.message : "Tên tài khoản hoặc mật khẩu không đúng"
+      if (
+        message.includes("disabled") ||
+        message.includes("locked") ||
+        message.includes("scheduled for deletion") ||
+        message.includes("approval") ||
+        message.includes("reactivated") ||
+        message.includes("vô hiệu hóa") ||
+        message.includes("chờ xóa") ||
+        message.includes("duyệt") ||
+        message.includes("mở lại")
+      ) {
+        setShowReactivationOptions(true)
+      }
+      setErrors({ username: message, password: message })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleReactivateAccount = async () => {
+    if (!validateForm()) return
+
+    setIsLoading(true)
+    setReactivationMessage(null)
+
+    try {
+      const result = await apiFetch<{
+        access_token: string
+        token_type: string
+        user: LearnHubUser
+      }>("/auth/reactivate", {
+        method: "POST",
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+        }),
+      })
+
+      saveAuth(result.data.access_token, result.data.user)
+      setReactivationMessage("Đã mở lại tài khoản thành công.")
+      setShowReactivationOptions(false)
+      router.push(redirectPathForRole(result.data.user.role))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không mở lại được tài khoản"
+      if (message.includes("approval") || message.includes("admin") || message.includes("duyệt")) {
+        setShowReactivationOptions(true)
+      }
+      setErrors({ username: message, password: message })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSubmitReactivationRequest = async () => {
+    if (!validateForm()) return
+    if (reactivationReason.trim().length < 10) {
+      const message = "Vui lòng nhập lý do ít nhất 10 ký tự"
+      setErrors({ username: message, password: message })
+      return
+    }
+
+    setIsLoading(true)
+    setReactivationMessage(null)
+
+    try {
+      await apiFetch("/auth/reactivation-requests", {
+        method: "POST",
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+          reason: reactivationReason.trim(),
+        }),
+      })
+      setReactivationMessage("Đã gửi yêu cầu mở lại tài khoản. Vui lòng chờ admin duyệt.")
+      setShowReactivationOptions(false)
+      setReactivationReason("")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không gửi được yêu cầu mở lại tài khoản"
       setErrors({ username: message, password: message })
     } finally {
       setIsLoading(false)
@@ -179,6 +262,53 @@ export default function LoginPage() {
                 >
                   {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
                 </Button>
+
+                {reactivationMessage && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                    {reactivationMessage}
+                  </div>
+                )}
+
+                {showReactivationOptions && (
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Tài khoản này chưa thể đăng nhập</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Nếu bạn tự vô hiệu hóa hoặc xóa tài khoản, có thể mở lại ngay. Nếu admin vô hiệu hóa, hãy gửi lý do để admin duyệt.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      size="lg"
+                      disabled={isLoading}
+                      onClick={handleReactivateAccount}
+                    >
+                      Mở lại tài khoản
+                    </Button>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="reactivationReason" className="text-foreground">Lý do mở lại nếu tài khoản bị admin vô hiệu hóa</Label>
+                      <Textarea
+                        id="reactivationReason"
+                        rows={3}
+                        value={reactivationReason}
+                        onChange={(e) => setReactivationReason(e.target.value)}
+                        placeholder="Nhập lý do để admin xem xét mở lại tài khoản..."
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                        disabled={isLoading}
+                        onClick={handleSubmitReactivationRequest}
+                      >
+                        Gửi yêu cầu admin duyệt
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-2xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground mt-4">
                   <p className="font-medium text-foreground mb-2">Tài khoản demo</p>

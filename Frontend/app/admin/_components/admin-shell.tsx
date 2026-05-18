@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react"
 import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { LogoutButton } from "@/components/logout-button"
 import {
   GraduationCap,
   Users,
@@ -117,7 +118,10 @@ export function AdminShell({
               </button>
               <h1 className="text-xl font-semibold text-foreground">{title}</h1>
             </div>
-            <div className="flex items-center gap-4">{topRight}</div>
+            <div className="flex items-center gap-4">
+              {topRight}
+              <LogoutButton variant="outline" />
+            </div>
           </div>
         </header>
 

@@ -31,5 +31,6 @@ class LessonOut(LessonBase):
     id: int
     course_id: int
     is_deleted: bool
+    deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime
