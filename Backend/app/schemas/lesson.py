@@ -25,6 +25,15 @@ class LessonUpdate(BaseModel):
     is_visible: bool | None = None
 
 
+class LessonReorderItem(BaseModel):
+    id: int
+    order_index: int = Field(..., ge=1)
+
+
+class LessonReorder(BaseModel):
+    items: list[LessonReorderItem] = Field(..., min_length=1)
+
+
 class LessonOut(LessonBase):
     model_config = ConfigDict(from_attributes=True)
 

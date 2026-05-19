@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   FileQuestion,
   FileText,
+  GripVertical,
   GraduationCap,
   Pencil,
   Plus,
@@ -177,12 +178,16 @@ export default function CourseEditorPage() {
   const [lessonEditForm, setLessonEditForm] = useState<LessonForm>(emptyLessonForm)
   const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null)
   const [questionEditForm, setQuestionEditForm] = useState<QuestionForm>(emptyQuestionForm)
+  const [isReorderingLessons, setIsReorderingLessons] = useState(false)
+  const [draftLessons, setDraftLessons] = useState<Lesson[]>([])
+  const [draggedLessonId, setDraggedLessonId] = useState<number | null>(null)
   const [loading, setLoading] = useState(!isNewCourse)
   const [savingCourse, setSavingCourse] = useState(false)
   const [savingLesson, setSavingLesson] = useState(false)
   const [savingQuestion, setSavingQuestion] = useState(false)
   const [savingLessonEdit, setSavingLessonEdit] = useState(false)
   const [savingQuestionEdit, setSavingQuestionEdit] = useState(false)
+  const [savingLessonOrder, setSavingLessonOrder] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -221,6 +226,7 @@ export default function CourseEditorPage() {
         setCourse(courseRes.data)
         setCourseForm(toForm(courseRes.data))
         setLessons(lessonsRes.data)
+        setDraftLessons(lessonsRes.data)
         setQuestionForm((prev) => ({ ...prev, lesson_id: lessonsRes.data[0]?.id ? String(lessonsRes.data[0].id) : "" }))
 
         const questionEntries = await Promise.all(
@@ -247,6 +253,12 @@ export default function CourseEditorPage() {
       alive = false
     }
   }, [courseId, isNewCourse, router])
+
+  useEffect(() => {
+    if (!isReorderingLessons) {
+      setDraftLessons(lessons)
+    }
+  }, [isReorderingLessons, lessons])
 
   const totalQuestions = useMemo(
     () => Object.values(questionsByLesson).reduce((sum, questions) => sum + questions.length, 0),
@@ -276,7 +288,9 @@ export default function CourseEditorPage() {
         level: courseForm.level,
       }
 
-      if (isNewCourse || !course || course.status === "draft" || course.status === "pending" || course.status === "rejected") {
+      if (isNewCourse) {
+        payload.status = "draft"
+      } else if (!course || course.status === "draft" || course.status === "pending" || course.status === "rejected") {
         payload.status = courseForm.status
       }
 
@@ -290,7 +304,7 @@ export default function CourseEditorPage() {
           method: "POST",
           body: JSON.stringify(payload),
         })
-        setMessage("Đã tạo khóa học. Bạn có thể thêm bài học và câu hỏi.")
+        setMessage("Đã lưu khóa học thành bản nháp. Bạn có thể thêm bài giảng và câu hỏi.")
         router.replace(`/instructor/course/${result.data.id}`)
         return
       }
@@ -423,6 +437,59 @@ export default function CourseEditorPage() {
       setError(err instanceof Error ? err.message : "Không cập nhật được bài giảng")
     } finally {
       setSavingLessonEdit(false)
+    }
+  }
+
+  function handleStartReorderLessons() {
+    setEditingLessonId(null)
+    setDraftLessons([...lessons].sort((a, b) => a.order_index - b.order_index))
+    setIsReorderingLessons(true)
+  }
+
+  function handleCancelReorderLessons() {
+    setDraftLessons(lessons)
+    setDraggedLessonId(null)
+    setIsReorderingLessons(false)
+  }
+
+  function handleDropLesson(targetLessonId: number) {
+    if (!draggedLessonId || draggedLessonId === targetLessonId) return
+    setDraftLessons((prev) => {
+      const fromIndex = prev.findIndex((lesson) => lesson.id === draggedLessonId)
+      const toIndex = prev.findIndex((lesson) => lesson.id === targetLessonId)
+      if (fromIndex < 0 || toIndex < 0) return prev
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+    setDraggedLessonId(null)
+  }
+
+  async function handleSaveLessonOrder() {
+    if (!currentCourseId) return
+
+    try {
+      setSavingLessonOrder(true)
+      setMessage(null)
+      setError(null)
+      const result = await apiFetch<Lesson[]>(`/lessons/course/${currentCourseId}/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          items: draftLessons.map((lesson, index) => ({
+            id: lesson.id,
+            order_index: index + 1,
+          })),
+        }),
+      })
+      setLessons(result.data)
+      setDraftLessons(result.data)
+      setIsReorderingLessons(false)
+      setMessage("Đã lưu thứ tự bài giảng.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không lưu được thứ tự bài giảng")
+    } finally {
+      setSavingLessonOrder(false)
     }
   }
 
@@ -607,8 +674,8 @@ export default function CourseEditorPage() {
         <Tabs defaultValue="info" className="space-y-6">
           <TabsList className="grid w-full max-w-xl grid-cols-3">
             <TabsTrigger value="info">Thông tin</TabsTrigger>
-            <TabsTrigger value="lessons">Bài giảng</TabsTrigger>
-            <TabsTrigger value="questions">Câu hỏi</TabsTrigger>
+            <TabsTrigger value="lessons" disabled={!currentCourseId}>Bài giảng</TabsTrigger>
+            <TabsTrigger value="questions" disabled={!currentCourseId}>Câu hỏi</TabsTrigger>
           </TabsList>
 
           <TabsContent value="info">
@@ -696,7 +763,11 @@ export default function CourseEditorPage() {
 
                     <div className="space-y-2">
                       <Label>Trạng thái gửi duyệt</Label>
-                      <Select value={courseForm.status} onValueChange={(value: "draft" | "pending") => setCourseForm((prev) => ({ ...prev, status: value }))}>
+                      <Select
+                        value={isNewCourse ? "draft" : courseForm.status}
+                        onValueChange={(value: "draft" | "pending") => setCourseForm((prev) => ({ ...prev, status: value }))}
+                        disabled={isNewCourse}
+                      >
                         <SelectTrigger className="w-full">
                           <SelectValue />
                         </SelectTrigger>
@@ -705,6 +776,9 @@ export default function CourseEditorPage() {
                           <SelectItem value="pending">Gửi admin duyệt</SelectItem>
                         </SelectContent>
                       </Select>
+                      {isNewCourse && (
+                        <p className="text-sm text-muted-foreground">Khóa học mới sẽ được lưu thành bản nháp trước, sau đó mới thêm bài giảng và gửi duyệt.</p>
+                      )}
                     </div>
                   </div>
 
@@ -765,15 +839,51 @@ export default function CourseEditorPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Danh sách bài giảng</CardTitle>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle>Danh sách bài giảng</CardTitle>
+                    <CardDescription>Chỉ lưu thứ tự mới vào hệ thống khi bạn bấm lưu thay đổi.</CardDescription>
+                  </div>
+                  {lessons.length > 1 && (
+                    <div className="flex flex-wrap gap-2">
+                      {isReorderingLessons ? (
+                        <>
+                          <Button size="sm" onClick={handleSaveLessonOrder} disabled={savingLessonOrder}>
+                            <Save className="mr-2 h-4 w-4" />
+                            {savingLessonOrder ? "Đang lưu..." : "Lưu thay đổi"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={handleCancelReorderLessons} disabled={savingLessonOrder}>
+                            <X className="mr-2 h-4 w-4" />
+                            Hủy
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={handleStartReorderLessons}>
+                          <GripVertical className="mr-2 h-4 w-4" />
+                          Thay đổi thứ tự
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {lessons.length === 0 ? (
                   <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">Chưa có bài giảng nào.</p>
                 ) : (
-                  lessons.map((lesson) => (
-                    <div key={lesson.id} className="rounded-lg border border-border p-4">
-                      {editingLessonId === lesson.id ? (
+                  (isReorderingLessons ? draftLessons : lessons).map((lesson, index) => (
+                    <div
+                      key={lesson.id}
+                      draggable={isReorderingLessons}
+                      onDragStart={() => setDraggedLessonId(lesson.id)}
+                      onDragOver={(event) => {
+                        if (isReorderingLessons) event.preventDefault()
+                      }}
+                      onDrop={() => handleDropLesson(lesson.id)}
+                      onDragEnd={() => setDraggedLessonId(null)}
+                      className={`rounded-lg border border-border p-4 ${isReorderingLessons ? "cursor-move bg-muted/30" : ""}`}
+                    >
+                      {editingLessonId === lesson.id && !isReorderingLessons ? (
                         <div className="grid gap-4 lg:grid-cols-2">
                           <div className="space-y-2">
                             <Label>Tên bài học</Label>
@@ -810,10 +920,10 @@ export default function CourseEditorPage() {
                       ) : (
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-start gap-3">
-                        {lesson.video_url ? <Video className="mt-1 h-5 w-5 text-primary" /> : <FileText className="mt-1 h-5 w-5 text-muted-foreground" />}
+                        {isReorderingLessons ? <GripVertical className="mt-1 h-5 w-5 text-muted-foreground" /> : lesson.video_url ? <Video className="mt-1 h-5 w-5 text-primary" /> : <FileText className="mt-1 h-5 w-5 text-muted-foreground" />}
                         <div>
                           <p className="font-medium text-foreground">
-                            Bài {lesson.order_index}: {lesson.title}
+                            Bài {isReorderingLessons ? index + 1 : lesson.order_index}: {lesson.title}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {Math.round(lesson.duration_seconds / 60)} phút • {lesson.is_deleted ? "Đã ẩn, có thể khôi phục trong 30 ngày" : lesson.is_visible ? "Đang hiển thị" : "Đã ẩn"}
@@ -821,7 +931,9 @@ export default function CourseEditorPage() {
                         </div>
                       </div>
                           <div className="flex items-center gap-2 self-end sm:self-center">
-                            {lesson.is_deleted ? (
+                            {isReorderingLessons ? (
+                              <Badge variant="outline">Kéo thả để đổi vị trí</Badge>
+                            ) : lesson.is_deleted ? (
                               <Button variant="outline" size="sm" onClick={() => handleRestoreLesson(lesson.id)}>
                                 <RotateCcw className="mr-2 h-4 w-4" />
                                 Khôi phục

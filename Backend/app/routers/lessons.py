@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.entities import Course, CourseStatus, Enrollment, EnrollmentStatus, Lesson, User, UserRole
 from app.schemas.common import ok
-from app.schemas.lesson import LessonCreate, LessonOut, LessonUpdate
+from app.schemas.lesson import LessonCreate, LessonOut, LessonReorder, LessonUpdate
 from app.services.course_service import assert_course_owner
 
 router = APIRouter(prefix="/lessons", tags=["Lessons"])
@@ -104,6 +104,39 @@ def create_lesson(payload: LessonCreate, db: Session = Depends(get_db), current_
     db.commit()
     db.refresh(lesson)
     return ok(LessonOut.model_validate(lesson), "Lesson created")
+
+
+@router.patch("/course/{course_id}/reorder")
+def reorder_lessons(
+    course_id: int,
+    payload: LessonReorder,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.instructor)),
+):
+    course = db.get(Course, course_id)
+    if not course or course.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    assert_course_owner(course, current_user)
+
+    lesson_ids = [item.id for item in payload.items]
+    if len(set(lesson_ids)) != len(lesson_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Duplicate lessons in reorder payload")
+
+    lessons = db.scalars(select(Lesson).where(Lesson.course_id == course_id, Lesson.id.in_(lesson_ids))).all()
+    if len(lessons) != len(lesson_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="All lessons must belong to this course")
+
+    lessons_by_id = {lesson.id: lesson for lesson in lessons}
+    for lesson in lessons:
+        lesson.order_index = -lesson.id
+    db.flush()
+
+    for item in payload.items:
+        lessons_by_id[item.id].order_index = item.order_index
+
+    db.commit()
+    ordered = db.scalars(select(Lesson).where(Lesson.course_id == course_id).order_by(Lesson.order_index)).all()
+    return ok([LessonOut.model_validate(lesson) for lesson in ordered], "Lesson order updated")
 
 
 @router.get("/{lesson_id}")

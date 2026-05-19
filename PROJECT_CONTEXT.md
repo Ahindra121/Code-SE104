@@ -1,0 +1,6 @@
+- Phần cài đặt của admin hiện chưa thể thay đổi dữ liệu
+- Phần cài đặt của giảng viên và học viên thì xóa đi khóa học của tôi và thành tựu
+- Phần cài đặt của học viên. Hãy cập nhật các thông số như số khóa học đăng ký, khoá học hoàn thành (nhớ liên kết cho đúng)... (xóa đi số giờ học)
+- Phần cài đật của giảng viên thì đổi thông số cho hợp lý ví dụ số khóa học, số học viên (nhớ liên kết cho đúng)
+- Đối với giảng viên khi thêm khóa học, cần lưu khoá học thành bản nháp trước rồi mới cho phép thêm bài giảng và quiz.
+- Phần bài giảng thì giảng viên có thể kéo thả thứ tự khi ấn vào nút thay đổi thứ tự. Chỉ lưu vào database khi ấn lưu thay đổi.

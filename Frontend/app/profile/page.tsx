@@ -20,8 +20,6 @@ import {
   Lock,
   Eye,
   EyeOff,
-  BookOpen,
-  Award,
   Edit3,
   Save,
   X,
@@ -46,6 +44,40 @@ import { Switch } from "@/components/ui/switch"
 import { apiFetch } from "@/lib/api"
 import { clearAuth, getStoredUser, LearnHubUser, redirectPathForRole, roleLabel, updateStoredUser } from "@/lib/auth"
 import { LogoutButton } from "@/components/logout-button"
+
+type EnrollmentSummary = {
+  course_id: number
+  course: {
+    id: number
+    lessons_count: number
+  } | null
+}
+
+type StudentReport = {
+  enrollments: number
+  progress_records: { course_id: number; lesson_id: number; is_completed: boolean }[]
+  certificates: { course_id: number; certificate_code: string }[]
+}
+
+type InstructorCourse = {
+  id: number
+  status: string
+  students_count: number
+}
+
+type InstructorReportItem = {
+  course_id: number
+  students: number
+}
+
+type ProfileStats = {
+  primary: number
+  primaryLabel: string
+  secondary: number
+  secondaryLabel: string
+  tertiary: number
+  tertiaryLabel: string
+}
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -76,6 +108,14 @@ export default function ProfilePage() {
     courseUpdates: true,
     promotions: false,
   })
+  const [stats, setStats] = useState<ProfileStats>({
+    primary: 0,
+    primaryLabel: "Khóa học đã đăng ký",
+    secondary: 0,
+    secondaryLabel: "Khóa học hoàn thành",
+    tertiary: 0,
+    tertiaryLabel: "Chứng chỉ",
+  })
 
   useEffect(() => {
     if (!getStoredUser()) {
@@ -95,6 +135,41 @@ export default function ProfilePage() {
           email: result.data.email,
           bio: result.data.bio ?? "",
         })
+
+        if (result.data.role === "student") {
+          const [enrollmentsRes, reportRes] = await Promise.all([
+            apiFetch<EnrollmentSummary[]>("/enrollments/mine"),
+            apiFetch<StudentReport>("/reports/student"),
+          ])
+          const completedCourses = enrollmentsRes.data.filter((enrollment) => {
+            const total = enrollment.course?.lessons_count ?? 0
+            const completed = reportRes.data.progress_records.filter(
+              (item) => item.course_id === enrollment.course_id && item.is_completed
+            ).length
+            return total > 0 && completed >= total
+          }).length
+          setStats({
+            primary: enrollmentsRes.data.length,
+            primaryLabel: "Khóa học đã đăng ký",
+            secondary: completedCourses,
+            secondaryLabel: "Khóa học hoàn thành",
+            tertiary: reportRes.data.certificates.length,
+            tertiaryLabel: "Chứng chỉ",
+          })
+        } else if (result.data.role === "instructor") {
+          const [coursesRes, reportRes] = await Promise.all([
+            apiFetch<InstructorCourse[]>("/courses/mine"),
+            apiFetch<InstructorReportItem[]>("/reports/instructor"),
+          ])
+          setStats({
+            primary: coursesRes.data.length,
+            primaryLabel: "Khóa học",
+            secondary: reportRes.data.reduce((sum, item) => sum + item.students, 0),
+            secondaryLabel: "Học viên",
+            tertiary: coursesRes.data.filter((course) => course.status === "approved").length,
+            tertiaryLabel: "Khóa đã duyệt",
+          })
+        }
       } catch (err) {
         clearAuth()
         router.push("/login")
@@ -270,30 +345,26 @@ export default function ProfilePage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border">
+            <div className="grid grid-cols-1 gap-4 mt-6 pt-6 border-t border-border sm:grid-cols-3">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{0}</div>
-                <div className="text-sm text-muted-foreground">Khóa học đã đăng ký</div>
+                <div className="text-2xl font-bold text-primary">{stats.primary}</div>
+                <div className="text-sm text-muted-foreground">{stats.primaryLabel}</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{0}</div>
-                <div className="text-sm text-muted-foreground">Khóa học hoàn thành</div>
+                <div className="text-2xl font-bold text-green-600">{stats.secondary}</div>
+                <div className="text-sm text-muted-foreground">{stats.secondaryLabel}</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{0}h</div>
-                <div className="text-sm text-muted-foreground">Giờ học tập</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">{0}</div>
-                <div className="text-sm text-muted-foreground">Chứng chỉ</div>
+                <div className="text-2xl font-bold text-yellow-600">{stats.tertiary}</div>
+                <div className="text-sm text-muted-foreground">{stats.tertiaryLabel}</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div>
             <Tabs defaultValue="profile" className="space-y-6">
               <TabsList className="grid grid-cols-4 w-full">
                 <TabsTrigger value="profile">Hồ sơ</TabsTrigger>
@@ -595,51 +666,6 @@ export default function ProfilePage() {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Khóa học gần đây
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border border-dashed border-border p-5 text-center">
-                  <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
-                  <p className="mt-3 text-sm font-medium text-foreground">Chưa có dữ liệu khóa học gần đây</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Thông tin này sẽ hiển thị khi bạn bắt đầu học từ tiến độ thật.</p>
-                </div>
-                <Link href="/dashboard">
-                  <Button variant="outline" className="w-full mt-2">
-                    Xem khóa học của tôi
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Thành tựu
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border border-dashed border-border p-5 text-center">
-                  <Award className="mx-auto h-8 w-8 text-muted-foreground" />
-                  <p className="mt-3 text-sm font-medium text-foreground">Chưa có thành tựu</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Chứng chỉ và thành tựu sẽ được cập nhật từ kết quả học tập thật.</p>
-                </div>
-                <Link href="/certificates">
-                  <Button variant="outline" className="w-full mt-2">
-                    Xem chứng chỉ
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </main>

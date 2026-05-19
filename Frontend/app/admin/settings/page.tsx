@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AdminShell } from "../_components/admin-shell"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,11 +10,27 @@ import { Button } from "@/components/ui/button"
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
+    platformName: "LearnHub",
+    supportEmail: "support@learnhub.vn",
+    maxUpload: "500MB",
     maintenanceMode: false,
     autoApproveInstructors: false,
     emailNotifications: true,
     weeklyReports: true,
   })
+  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    const stored = localStorage.getItem("learnhub-admin-settings")
+    if (stored) {
+      setSettings((prev) => ({ ...prev, ...JSON.parse(stored) }))
+    }
+  }, [])
+
+  function handleSaveSettings() {
+    localStorage.setItem("learnhub-admin-settings", JSON.stringify(settings))
+    setSavedMessage("Đã lưu thay đổi cài đặt quản trị.")
+  }
 
   return (
     <AdminShell title="Cài đặt quản trị" activeKey="settings">
@@ -31,15 +47,28 @@ export default function AdminSettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="platformName">Tên nền tảng</Label>
-              <Input id="platformName" defaultValue="LearnHub" />
+              <Input
+                id="platformName"
+                value={settings.platformName}
+                onChange={(event) => setSettings((prev) => ({ ...prev, platformName: event.target.value }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="supportEmail">Email hỗ trợ</Label>
-              <Input id="supportEmail" defaultValue="support@learnhub.vn" />
+              <Input
+                id="supportEmail"
+                type="email"
+                value={settings.supportEmail}
+                onChange={(event) => setSettings((prev) => ({ ...prev, supportEmail: event.target.value }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="maxUpload">Dung lượng tải lên tối đa</Label>
-              <Input id="maxUpload" defaultValue="500MB" />
+              <Input
+                id="maxUpload"
+                value={settings.maxUpload}
+                onChange={(event) => setSettings((prev) => ({ ...prev, maxUpload: event.target.value }))}
+              />
             </div>
           </CardContent>
         </Card>
@@ -93,8 +122,9 @@ export default function AdminSettingsPage() {
         </Card>
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <Button>Lưu thay đổi</Button>
+      <div className="mt-6 flex flex-col items-end gap-3">
+        {savedMessage && <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{savedMessage}</div>}
+        <Button onClick={handleSaveSettings}>Lưu thay đổi</Button>
       </div>
     </AdminShell>
   )
