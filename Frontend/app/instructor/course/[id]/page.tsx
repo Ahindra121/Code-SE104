@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { apiFetch } from "@/lib/api"
+import { API_BASE_URL, apiFetch } from "@/lib/api"
 import { getStoredUser, redirectPathForRole } from "@/lib/auth"
 import { LogoutButton } from "@/components/logout-button"
 import { Badge } from "@/components/ui/badge"
@@ -55,6 +55,8 @@ type Lesson = {
   title: string
   video_url?: string | null
   document_url?: string | null
+  document_name?: string | null
+  document_type?: string | null
   order_index: number
   duration_seconds: number
   is_visible: boolean
@@ -89,7 +91,6 @@ type LessonForm = {
   title: string
   video_url: string
   document_url: string
-  duration_minutes: string
   is_visible: boolean
 }
 
@@ -104,6 +105,12 @@ type QuestionForm = {
 }
 
 const categories = ["IT", "Business", "Language", "Soft Skills"]
+const VIDEO_ACCEPT = ".mp4,.webm,.mov"
+const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx"
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024
+const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov"]
+const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
 const levels: { value: CourseLevel; label: string }[] = [
   { value: "basic", label: "Cơ bản" },
   { value: "intermediate", label: "Trung bình" },
@@ -124,7 +131,6 @@ const emptyLessonForm: LessonForm = {
   title: "",
   video_url: "",
   document_url: "",
-  duration_minutes: "0",
   is_visible: true,
 }
 
@@ -162,6 +168,31 @@ function toForm(course: Course): CourseForm {
   }
 }
 
+function fileExtension(file: File) {
+  return file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
+}
+
+function validateUploadFile(file: File, type: "video" | "document") {
+  const isVideo = type === "video"
+  const allowedExtensions = isVideo ? VIDEO_EXTENSIONS : DOCUMENT_EXTENSIONS
+  const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_DOCUMENT_SIZE
+  const label = isVideo ? "Video" : "Tài liệu"
+
+  if (!allowedExtensions.includes(fileExtension(file))) {
+    return `${label} sai định dạng file`
+  }
+  if (file.size > maxSize) {
+    return `${label} vượt quá ${isVideo ? "100MB" : "20MB"}`
+  }
+  return null
+}
+
+function assetUrl(url?: string | null) {
+  if (!url) return ""
+  if (/^https?:\/\//i.test(url)) return url
+  return `${API_BASE_URL}${url}`
+}
+
 export default function CourseEditorPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
@@ -173,9 +204,13 @@ export default function CourseEditorPage() {
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [questionsByLesson, setQuestionsByLesson] = useState<Record<number, Question[]>>({})
   const [lessonForm, setLessonForm] = useState<LessonForm>(emptyLessonForm)
+  const [lessonVideoFile, setLessonVideoFile] = useState<File | null>(null)
+  const [lessonDocumentFile, setLessonDocumentFile] = useState<File | null>(null)
   const [questionForm, setQuestionForm] = useState<QuestionForm>(emptyQuestionForm)
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null)
   const [lessonEditForm, setLessonEditForm] = useState<LessonForm>(emptyLessonForm)
+  const [lessonEditVideoFile, setLessonEditVideoFile] = useState<File | null>(null)
+  const [lessonEditDocumentFile, setLessonEditDocumentFile] = useState<File | null>(null)
   const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null)
   const [questionEditForm, setQuestionEditForm] = useState<QuestionForm>(emptyQuestionForm)
   const [isReorderingLessons, setIsReorderingLessons] = useState(false)
@@ -186,6 +221,7 @@ export default function CourseEditorPage() {
   const [savingLesson, setSavingLesson] = useState(false)
   const [savingQuestion, setSavingQuestion] = useState(false)
   const [savingLessonEdit, setSavingLessonEdit] = useState(false)
+  const [uploadingLessonAsset, setUploadingLessonAsset] = useState<string | null>(null)
   const [savingQuestionEdit, setSavingQuestionEdit] = useState(false)
   const [savingLessonOrder, setSavingLessonOrder] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -323,6 +359,39 @@ export default function CourseEditorPage() {
     }
   }
 
+  async function uploadLessonAsset(lessonId: number, type: "video" | "document", file: File) {
+    const validationError = validateUploadFile(file, type)
+    if (validationError) {
+      throw new Error(validationError)
+    }
+
+    const formData = new FormData()
+    formData.append("file", file)
+    setUploadingLessonAsset(`${lessonId}:${type}`)
+
+    const result = await apiFetch<Lesson>(`/lessons/${lessonId}/upload-${type}`, {
+      method: "POST",
+      body: formData,
+    })
+    return result.data
+  }
+
+  async function uploadLessonFiles(lessonId: number, videoFile: File | null, documentFile: File | null) {
+    let updatedLesson: Lesson | null = null
+
+    try {
+      if (videoFile) {
+        updatedLesson = await uploadLessonAsset(lessonId, "video", videoFile)
+      }
+      if (documentFile) {
+        updatedLesson = await uploadLessonAsset(lessonId, "document", documentFile)
+      }
+      return updatedLesson
+    } finally {
+      setUploadingLessonAsset(null)
+    }
+  }
+
   async function handleAddLesson() {
     if (!currentCourseId) {
       setError("Vui lòng lưu khóa học trước khi thêm bài học")
@@ -337,9 +406,9 @@ export default function CourseEditorPage() {
       const payload = {
         course_id: currentCourseId,
         title: lessonForm.title.trim(),
-        video_url: lessonForm.video_url.trim() || null,
-        document_url: lessonForm.document_url.trim() || null,
-        duration_seconds: Math.max(0, Math.round((Number(lessonForm.duration_minutes) || 0) * 60)),
+        video_url: null,
+        document_url: null,
+        duration_seconds: 0,
         order_index: lessons.length + 1,
         is_visible: lessonForm.is_visible,
       }
@@ -354,10 +423,20 @@ export default function CourseEditorPage() {
         body: JSON.stringify(payload),
       })
 
-      setLessons((prev) => [...prev, result.data])
-      setQuestionsByLesson((prev) => ({ ...prev, [result.data.id]: [] }))
-      setQuestionForm((prev) => ({ ...prev, lesson_id: prev.lesson_id || String(result.data.id) }))
+      let savedLesson = result.data
+      setLessons((prev) => [...prev, savedLesson])
+      setQuestionsByLesson((prev) => ({ ...prev, [savedLesson.id]: [] }))
+      setQuestionForm((prev) => ({ ...prev, lesson_id: prev.lesson_id || String(savedLesson.id) }))
+
+      const uploadedLesson = await uploadLessonFiles(savedLesson.id, lessonVideoFile, lessonDocumentFile)
+      if (uploadedLesson) {
+        savedLesson = uploadedLesson
+        setLessons((prev) => prev.map((lesson) => (lesson.id === savedLesson.id ? savedLesson : lesson)))
+      }
+
       setLessonForm(emptyLessonForm)
+      setLessonVideoFile(null)
+      setLessonDocumentFile(null)
       setMessage("Đã thêm bài học.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thêm được bài học")
@@ -396,11 +475,12 @@ export default function CourseEditorPage() {
 
   function startEditLesson(lesson: Lesson) {
     setEditingLessonId(lesson.id)
+    setLessonEditVideoFile(null)
+    setLessonEditDocumentFile(null)
     setLessonEditForm({
       title: lesson.title,
       video_url: lesson.video_url ?? "",
       document_url: lesson.document_url ?? "",
-      duration_minutes: String(Math.round(lesson.duration_seconds / 60)),
       is_visible: lesson.is_visible,
     })
   }
@@ -415,7 +495,7 @@ export default function CourseEditorPage() {
         title: lessonEditForm.title.trim(),
         video_url: lessonEditForm.video_url.trim() || null,
         document_url: lessonEditForm.document_url.trim() || null,
-        duration_seconds: Math.max(0, Math.round((Number(lessonEditForm.duration_minutes) || 0) * 60)),
+        duration_seconds: 0,
         is_visible: lessonEditForm.is_visible,
       }
 
@@ -429,9 +509,19 @@ export default function CourseEditorPage() {
         body: JSON.stringify(payload),
       })
 
-      setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? result.data : lesson)))
+      let savedLesson = result.data
+      setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? savedLesson : lesson)))
+
+      const uploadedLesson = await uploadLessonFiles(lessonId, lessonEditVideoFile, lessonEditDocumentFile)
+      if (uploadedLesson) {
+        savedLesson = uploadedLesson
+        setLessons((prev) => prev.map((lesson) => (lesson.id === lessonId ? savedLesson : lesson)))
+      }
+
       setEditingLessonId(null)
       setLessonEditForm(emptyLessonForm)
+      setLessonEditVideoFile(null)
+      setLessonEditDocumentFile(null)
       setMessage("Đã cập nhật bài giảng.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không cập nhật được bài giảng")
@@ -803,7 +893,7 @@ export default function CourseEditorPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Thêm bài giảng</CardTitle>
-                <CardDescription>Hỗ trợ video URL, tài liệu URL, thời lượng và trạng thái hiển thị.</CardDescription>
+                <CardDescription>Hỗ trợ video URL, tài liệu URL và trạng thái hiển thị.</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
@@ -811,26 +901,27 @@ export default function CourseEditorPage() {
                   <Input value={lessonForm.title} onChange={(e) => setLessonForm((prev) => ({ ...prev, title: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Thời lượng phút</Label>
+                  <Label>Upload video</Label>
                   <Input
-                    type="number"
-                    min={0}
-                    value={lessonForm.duration_minutes}
-                    onChange={(e) => setLessonForm((prev) => ({ ...prev, duration_minutes: e.target.value }))}
+                    type="file"
+                    accept={VIDEO_ACCEPT}
+                    onChange={(e) => setLessonVideoFile(e.target.files?.[0] ?? null)}
                   />
+                  <p className="text-xs text-muted-foreground">MP4, WebM, MOV; tối đa 100MB.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Video URL</Label>
-                  <Input value={lessonForm.video_url} onChange={(e) => setLessonForm((prev) => ({ ...prev, video_url: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tài liệu URL</Label>
-                  <Input value={lessonForm.document_url} onChange={(e) => setLessonForm((prev) => ({ ...prev, document_url: e.target.value }))} />
+                  <Label>Upload tài liệu</Label>
+                  <Input
+                    type="file"
+                    accept={DOCUMENT_ACCEPT}
+                    onChange={(e) => setLessonDocumentFile(e.target.files?.[0] ?? null)}
+                  />
+                  <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, PPT, PPTX; tối đa 20MB.</p>
                 </div>
                 <div className="lg:col-span-2">
-                  <Button onClick={handleAddLesson} disabled={savingLesson || !currentCourseId}>
+                  <Button onClick={handleAddLesson} disabled={savingLesson || Boolean(uploadingLessonAsset) || !currentCourseId}>
                     <Plus className="mr-2 h-4 w-4" />
-                    {savingLesson ? "Đang thêm..." : "Thêm bài học"}
+                    {savingLesson || uploadingLessonAsset ? "Đang upload..." : "Thêm bài học"}
                   </Button>
                   {!currentCourseId && <p className="mt-2 text-sm text-muted-foreground">Hãy lưu khóa học trước khi thêm bài giảng.</p>}
                 </div>
@@ -890,26 +981,27 @@ export default function CourseEditorPage() {
                             <Input value={lessonEditForm.title} onChange={(e) => setLessonEditForm((prev) => ({ ...prev, title: e.target.value }))} />
                           </div>
                           <div className="space-y-2">
-                            <Label>Thời lượng phút</Label>
+                            <Label>Upload video mới</Label>
                             <Input
-                              type="number"
-                              min={0}
-                              value={lessonEditForm.duration_minutes}
-                              onChange={(e) => setLessonEditForm((prev) => ({ ...prev, duration_minutes: e.target.value }))}
+                              type="file"
+                              accept={VIDEO_ACCEPT}
+                              onChange={(e) => setLessonEditVideoFile(e.target.files?.[0] ?? null)}
                             />
+                            {lesson.video_url && <p className="text-xs text-muted-foreground">Đã có video: {lesson.video_url}</p>}
                           </div>
                           <div className="space-y-2">
-                            <Label>Video URL</Label>
-                            <Input value={lessonEditForm.video_url} onChange={(e) => setLessonEditForm((prev) => ({ ...prev, video_url: e.target.value }))} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Tài liệu URL</Label>
-                            <Input value={lessonEditForm.document_url} onChange={(e) => setLessonEditForm((prev) => ({ ...prev, document_url: e.target.value }))} />
+                            <Label>Upload tài liệu mới</Label>
+                            <Input
+                              type="file"
+                              accept={DOCUMENT_ACCEPT}
+                              onChange={(e) => setLessonEditDocumentFile(e.target.files?.[0] ?? null)}
+                            />
+                            {lesson.document_url && <p className="text-xs text-muted-foreground">Đã có tài liệu: {lesson.document_name || lesson.document_url}</p>}
                           </div>
                           <div className="flex flex-wrap gap-2 lg:col-span-2">
-                            <Button size="sm" onClick={() => handleUpdateLesson(lesson.id)} disabled={savingLessonEdit}>
+                            <Button size="sm" onClick={() => handleUpdateLesson(lesson.id)} disabled={savingLessonEdit || Boolean(uploadingLessonAsset)}>
                               <Save className="mr-2 h-4 w-4" />
-                              {savingLessonEdit ? "Đang lưu..." : "Lưu bài giảng"}
+                              {savingLessonEdit || uploadingLessonAsset ? "Đang upload..." : "Lưu bài giảng"}
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => setEditingLessonId(null)}>
                               <X className="mr-2 h-4 w-4" />
@@ -926,8 +1018,28 @@ export default function CourseEditorPage() {
                             Bài {isReorderingLessons ? index + 1 : lesson.order_index}: {lesson.title}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {Math.round(lesson.duration_seconds / 60)} phút • {lesson.is_deleted ? "Đã ẩn, có thể khôi phục trong 30 ngày" : lesson.is_visible ? "Đang hiển thị" : "Đã ẩn"}
+                            {lesson.is_deleted ? "Đã ẩn, có thể khôi phục trong 30 ngày" : lesson.is_visible ? "Đang hiển thị" : "Đã ẩn"}
                           </p>
+                          {(lesson.video_url || lesson.document_url) && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {lesson.document_name && <Badge variant="secondary">{lesson.document_name}</Badge>}
+                              {lesson.video_url && (
+                                <Button size="sm" variant="outline" asChild>
+                                  <a href={assetUrl(lesson.video_url)} target="_blank" rel="noreferrer">Xem video</a>
+                                </Button>
+                              )}
+                              {lesson.document_url && (
+                                <>
+                                  <Button size="sm" variant="outline" asChild>
+                                    <a href={assetUrl(lesson.document_url)} target="_blank" rel="noreferrer">Xem tài liệu</a>
+                                  </Button>
+                                  <Button size="sm" variant="outline" asChild>
+                                    <a href={`${API_BASE_URL}/api/lessons/${lesson.id}/download-document`} download={lesson.document_name || true}>Tải tài liệu</a>
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                           <div className="flex items-center gap-2 self-end sm:self-center">

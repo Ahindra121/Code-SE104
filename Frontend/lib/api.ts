@@ -6,7 +6,8 @@ export type ApiResponse<T> = {
   data: T
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api"
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api"
+export const API_BASE_URL = API_URL.replace(/\/api\/?$/, "")
 
 function getErrorMessage(result: any) {
   if (typeof result?.message === "string") return result.message
@@ -36,7 +37,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const token = typeof window !== "undefined" ? getStoredToken() : null
   const headers = new Headers(options.headers)
 
-  if (!headers.has("Content-Type") && options.body) {
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData
+  if (!headers.has("Content-Type") && options.body && !isFormData) {
     headers.set("Content-Type", "application/json")
   }
 

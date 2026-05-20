@@ -69,7 +69,7 @@ class AnswerOption(str, enum.Enum):
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True), default=func.now(), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
 
@@ -180,6 +180,8 @@ class Lesson(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     video_url: Mapped[str | None] = mapped_column(String(600))
     document_url: Mapped[str | None] = mapped_column(String(600))
+    document_name: Mapped[str | None] = mapped_column(String(255))
+    document_type: Mapped[str | None] = mapped_column(String(30))
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -216,10 +218,16 @@ class LearningProgress(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False)
+    progress_percent: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     watched_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_watched_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duration_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     document_viewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     student: Mapped[User] = relationship(back_populates="progress_records")
     course: Mapped[Course] = relationship(back_populates="progress_records")

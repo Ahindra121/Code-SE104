@@ -10,7 +10,6 @@ from app.models.entities import (
     Enrollment,
     Lesson,
     Question,
-    Review,
     User,
     UserRole,
 )
@@ -102,7 +101,6 @@ def run() -> None:
                 ]
             )
             db.add(Enrollment(student_id=student.id, course_id=course1.id))
-            db.add(Review(student_id=student.id, course_id=course1.id, rating=5, comment="Course content is practical and clear."))
 
         db.commit()
         print("Seed data created. Demo password for all users: Demo@123")

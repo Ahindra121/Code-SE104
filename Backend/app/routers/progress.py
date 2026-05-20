@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import require_roles
-from app.models.entities import Enrollment, EnrollmentStatus, LearningProgress, Lesson, QuizAttempt, User, UserRole
+from app.models.entities import Enrollment, EnrollmentStatus, LearningProgress, Lesson, Question, QuizAttempt, User, UserRole
 from app.schemas.common import ok
 from app.schemas.progress import CourseProgressOut, ProgressOut, ProgressUpdate
 
@@ -52,6 +52,17 @@ def calculate_course_progress(db: Session, student_id: int, course_id: int) -> C
     )
 
 
+def _has_active_quiz(db: Session, lesson_id: int) -> bool:
+    return bool(
+        db.scalar(
+            select(Question.id).where(
+                Question.lesson_id == lesson_id,
+                Question.is_active.is_(True),
+            )
+        )
+    )
+
+
 def _has_passing_quiz(db: Session, student_id: int, lesson_id: int) -> bool:
     return bool(
         db.scalar(
@@ -59,21 +70,51 @@ def _has_passing_quiz(db: Session, student_id: int, lesson_id: int) -> bool:
                 QuizAttempt.student_id == student_id,
                 QuizAttempt.lesson_id == lesson_id,
                 QuizAttempt.passed.is_(True),
+                QuizAttempt.score >= 8,
             )
         )
     )
 
 
 def sync_lesson_completion(db: Session, progress: LearningProgress, lesson: Lesson) -> None:
-    has_learning_content = bool(lesson.video_url or lesson.document_url)
-    if lesson.duration_seconds > 0:
-        content_completed = progress.watched_seconds >= lesson.duration_seconds * 0.9
+    if progress.is_completed:
+        return
+    if lesson.video_url:
+        content_completed = (progress.progress_percent or 0) >= 90
     else:
-        content_completed = progress.document_viewed
+        content_completed = True
 
-    if (not has_learning_content or content_completed) and _has_passing_quiz(db, progress.student_id, lesson.id):
+    quiz_completed = not _has_active_quiz(db, lesson.id) or _has_passing_quiz(db, progress.student_id, lesson.id)
+    if content_completed and quiz_completed:
         progress.is_completed = True
         progress.completed_at = progress.completed_at or datetime.now(UTC)
+
+
+def apply_progress_update(
+    progress: LearningProgress,
+    lesson: Lesson,
+    watched_seconds: int,
+    max_watched_seconds: int,
+    duration_seconds: int,
+    progress_percent: float,
+) -> None:
+    progress.duration_seconds = max(progress.duration_seconds or 0, duration_seconds, lesson.duration_seconds or 0)
+
+    if progress.duration_seconds:
+        safe_watched_seconds = min(watched_seconds, progress.duration_seconds)
+        requested_max_watched = min(max(max_watched_seconds, safe_watched_seconds), progress.duration_seconds)
+    else:
+        safe_watched_seconds = watched_seconds
+        requested_max_watched = max(max_watched_seconds, safe_watched_seconds)
+
+    progress.max_watched_seconds = max(progress.max_watched_seconds or 0, requested_max_watched)
+    progress.watched_seconds = min(safe_watched_seconds, progress.max_watched_seconds)
+    calculated_percent = (
+        0
+        if progress.duration_seconds <= 0
+        else round((progress.max_watched_seconds / progress.duration_seconds) * 100, 2)
+    )
+    progress.progress_percent = 100 if progress.is_completed else min(100, calculated_percent)
 
 
 @router.post("")
@@ -92,7 +133,14 @@ def update_progress(payload: ProgressUpdate, db: Session = Depends(get_db), curr
             is_completed=False,
         )
         db.add(progress)
-    progress.watched_seconds = max(progress.watched_seconds or 0, payload.watched_seconds)
+    apply_progress_update(
+        progress,
+        lesson,
+        payload.watched_seconds,
+        payload.max_watched_seconds,
+        payload.duration_seconds,
+        payload.progress_percent,
+    )
     progress.document_viewed = progress.document_viewed or payload.document_viewed
     sync_lesson_completion(db, progress, lesson)
     db.commit()

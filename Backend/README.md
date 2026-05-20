@@ -44,7 +44,7 @@ alembic upgrade head
 5. Tạo dữ liệu mẫu:
 
 ```powershell
-python -m app.seed
+.\.venv\Scripts\python.exe -m app.seed
 ```
 
 Tài khoản mẫu đều dùng mật khẩu `Demo@123`:
@@ -56,8 +56,17 @@ Tài khoản mẫu đều dùng mật khẩu `Demo@123`:
 6. Chạy server:
 
 ```powershell
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+
+Nếu terminal đang ở thư mục gốc đồ án `D:\Code SE104`, chạy:
+
+```powershell
+cd Backend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Không nên chạy bằng lệnh `python` chung của máy nếu máy có nhiều Python, vì có thể trỏ nhầm sang Python của pgAdmin/PostgreSQL và thiếu thư viện backend.
 
 Docs: `http://127.0.0.1:8000/docs`
 

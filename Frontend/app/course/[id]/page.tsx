@@ -80,12 +80,6 @@ function formatPrice(price: number) {
   return price === 0 ? "Miễn phí" : `${price.toLocaleString("vi-VN")}đ`
 }
 
-function formatDuration(seconds: number) {
-  if (!seconds) return "Chưa cập nhật"
-  const minutes = Math.max(1, Math.round(seconds / 60))
-  return `${minutes} phút`
-}
-
 function instructorName(course: Course) {
   return course.instructor?.full_name || course.instructor?.username || "Giảng viên"
 }
@@ -456,7 +450,6 @@ export default function CourseDetailPage() {
                           </p>
                         </div>
                       </div>
-                      <span className="text-sm text-muted-foreground">{formatDuration(lesson.duration_seconds)}</span>
                     </Link>
                     )
                   })

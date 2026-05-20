@@ -1,12 +1,18 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from app.core.config import settings
 from app.routers import auth, certificates, courses, enrollments, lessons, progress, questions, quizzes, reports, reviews, users
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
+UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"
+UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

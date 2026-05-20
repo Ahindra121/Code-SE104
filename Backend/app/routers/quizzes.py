@@ -40,7 +40,7 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
         score=score,
         total_questions=len(questions),
         correct_count=correct_count,
-        passed=score >= 5,
+        passed=score >= 8,
     )
     db.add(attempt)
     db.flush()
@@ -67,6 +67,9 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
             course_id=lesson.course_id,
             lesson_id=lesson.id,
             watched_seconds=0,
+            max_watched_seconds=0,
+            duration_seconds=lesson.duration_seconds or 0,
+            progress_percent=0,
             document_viewed=False,
             is_completed=False,
         )

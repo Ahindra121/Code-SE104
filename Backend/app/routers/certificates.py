@@ -47,6 +47,7 @@ def eligibility(db: Session, student_id: int, course_id: int) -> None:
                 QuizAttempt.course_id == course_id,
                 QuizAttempt.lesson_id == lesson_id,
                 QuizAttempt.passed.is_(True),
+                QuizAttempt.score >= 8,
             )
         )
         if not passed:
