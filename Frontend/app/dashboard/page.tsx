@@ -1,5 +1,6 @@
 ﻿"use client"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -443,7 +444,7 @@ export default function StudentDashboard() {
                       >
                         <div className="sm:w-48 aspect-video rounded-lg overflow-hidden flex-shrink-0 bg-muted">
                           <img
-                            src={course.thumbnail_url || "/placeholder.jpg"}
+                            src={getCourseThumbnailUrl(course)}
                             alt={course.title}
                             className="h-full w-full object-cover"
                           />
@@ -508,7 +509,7 @@ export default function StudentDashboard() {
                       <div className="group rounded-lg border border-border overflow-hidden hover:shadow-md transition-all">
                         <div className="aspect-video overflow-hidden bg-muted">
                           <img
-                            src={course.thumbnail_url || "/placeholder.jpg"}
+                            src={getCourseThumbnailUrl(course)}
                             alt={course.title}
                             className="h-full w-full object-cover transition-transform group-hover:scale-105"
                           />

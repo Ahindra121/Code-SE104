@@ -100,7 +100,8 @@ export default function LessonPage() {
       router.push("/login")
       return
     }
-    setViewerRole(user.role)
+    const currentUser = user
+    setViewerRole(currentUser.role)
 
     let alive = true
 
@@ -122,7 +123,7 @@ export default function LessonPage() {
 
         const [questionsRes, progressRes] = await Promise.allSettled([
           apiFetch<Question[]>(`/questions/lesson/${lessonId}`),
-          user.role === "student" ? apiFetch<ProgressOut>(`/lessons/${lessonId}/progress`) : Promise.resolve(null),
+          currentUser.role === "student" ? apiFetch<ProgressOut>(`/lessons/${lessonId}/progress`) : Promise.resolve(null),
         ])
 
         if (!alive) return

@@ -1,9 +1,10 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { API_BASE_URL, apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { getStoredUser, redirectPathForRole } from "@/lib/auth"
 import { LogoutButton } from "@/components/logout-button"
 import { Badge } from "@/components/ui/badge"
@@ -31,7 +32,7 @@ import {
   X,
 } from "lucide-react"
 
-type CourseStatus = "draft" | "pending" | "approved" | "rejected" | "hidden" | "archived"
+type CourseStatus = "draft" | "pending" | "pending_review" | "approved" | "rejected" | "hidden" | "archived"
 type CourseLevel = "basic" | "intermediate" | "advanced"
 type AnswerOption = "A" | "B" | "C" | "D"
 
@@ -84,7 +85,29 @@ type CourseForm = {
   price: string
   thumbnail_url: string
   level: CourseLevel
-  status: "draft" | "pending"
+  status: "draft" | "pending_review"
+}
+
+type VerificationStatus = "pending" | "approved" | "rejected"
+
+type InstructorVerification = {
+  id: number
+  status: VerificationStatus
+  major: string
+  university_name: string
+  graduation_year: number
+  admin_note?: string | null
+}
+
+type VerificationForm = {
+  full_name: string
+  cccd_number: string
+  major: string
+  university_name: string
+  graduation_year: string
+  cccd_front_file: File | null
+  cccd_back_file: File | null
+  degree_file: File | null
 }
 
 type LessonForm = {
@@ -105,10 +128,13 @@ type QuestionForm = {
 }
 
 const categories = ["IT", "Business", "Language", "Soft Skills"]
+const THUMBNAIL_ACCEPT = ".jpg,.jpeg,.png,.webp"
 const VIDEO_ACCEPT = ".mp4,.webm,.mov"
 const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx"
+const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
+const THUMBNAIL_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov"]
 const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
 const levels: { value: CourseLevel; label: string }[] = [
@@ -125,6 +151,17 @@ const emptyCourseForm: CourseForm = {
   thumbnail_url: "",
   level: "basic",
   status: "draft",
+}
+
+const emptyVerificationForm: VerificationForm = {
+  full_name: "",
+  cccd_number: "",
+  major: "",
+  university_name: "",
+  graduation_year: "",
+  cccd_front_file: null,
+  cccd_back_file: null,
+  degree_file: null,
 }
 
 const emptyLessonForm: LessonForm = {
@@ -148,6 +185,7 @@ function statusLabel(status: CourseStatus) {
   const labels: Record<CourseStatus, string> = {
     draft: "Bản nháp",
     pending: "Chờ duyệt",
+    pending_review: "Chờ duyệt",
     approved: "Đã duyệt",
     rejected: "Từ chối",
     hidden: "Đã ẩn",
@@ -164,7 +202,7 @@ function toForm(course: Course): CourseForm {
     price: String(course.price),
     thumbnail_url: course.thumbnail_url ?? "",
     level: course.level,
-    status: course.status === "pending" ? "pending" : "draft",
+    status: course.status === "pending" || course.status === "pending_review" ? "pending_review" : "draft",
   }
 }
 
@@ -187,6 +225,16 @@ function validateUploadFile(file: File, type: "video" | "document") {
   return null
 }
 
+function validateThumbnailFile(file: File) {
+  if (!THUMBNAIL_EXTENSIONS.includes(fileExtension(file))) {
+    return "Ảnh đại diện chỉ hỗ trợ JPG, JPEG, PNG hoặc WEBP"
+  }
+  if (file.size > MAX_THUMBNAIL_SIZE) {
+    return "Ảnh đại diện vượt quá 5MB"
+  }
+  return null
+}
+
 function assetUrl(url?: string | null) {
   if (!url) return ""
   if (/^https?:\/\//i.test(url)) return url
@@ -201,6 +249,8 @@ export default function CourseEditorPage() {
 
   const [course, setCourse] = useState<Course | null>(null)
   const [courseForm, setCourseForm] = useState<CourseForm>(emptyCourseForm)
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [questionsByLesson, setQuestionsByLesson] = useState<Record<number, Question[]>>({})
   const [lessonForm, setLessonForm] = useState<LessonForm>(emptyLessonForm)
@@ -218,6 +268,7 @@ export default function CourseEditorPage() {
   const [draggedLessonId, setDraggedLessonId] = useState<number | null>(null)
   const [loading, setLoading] = useState(!isNewCourse)
   const [savingCourse, setSavingCourse] = useState(false)
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false)
   const [savingLesson, setSavingLesson] = useState(false)
   const [savingQuestion, setSavingQuestion] = useState(false)
   const [savingLessonEdit, setSavingLessonEdit] = useState(false)
@@ -226,6 +277,9 @@ export default function CourseEditorPage() {
   const [savingLessonOrder, setSavingLessonOrder] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [verification, setVerification] = useState<InstructorVerification | null>(null)
+  const [verificationForm, setVerificationForm] = useState<VerificationForm>(emptyVerificationForm)
+  const [savingVerification, setSavingVerification] = useState(false)
 
   const currentCourseId = course?.id ?? (Number.isFinite(courseId) ? courseId : null)
 
@@ -241,17 +295,19 @@ export default function CourseEditorPage() {
       return
     }
 
-    if (isNewCourse) {
-      setLoading(false)
-      return
-    }
-
     let alive = true
 
-    async function loadCourse() {
+    async function loadPage() {
       try {
         setLoading(true)
         setError(null)
+        const verificationRes = await apiFetch<InstructorVerification | null>("/instructor-verifications/me")
+        if (!alive) return
+        setVerification(verificationRes.data)
+
+        if (isNewCourse) {
+          return
+        }
 
         const [courseRes, lessonsRes] = await Promise.all([
           apiFetch<Course>(`/courses/${courseId}`),
@@ -284,7 +340,7 @@ export default function CourseEditorPage() {
       }
     }
 
-    loadCourse()
+    loadPage()
     return () => {
       alive = false
     }
@@ -295,6 +351,16 @@ export default function CourseEditorPage() {
       setDraftLessons(lessons)
     }
   }, [isReorderingLessons, lessons])
+
+  useEffect(() => {
+    if (!thumbnailFile) {
+      setThumbnailPreviewUrl(null)
+      return
+    }
+    const objectUrl = URL.createObjectURL(thumbnailFile)
+    setThumbnailPreviewUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [thumbnailFile])
 
   const totalQuestions = useMemo(
     () => Object.values(questionsByLesson).reduce((sum, questions) => sum + questions.length, 0),
@@ -314,7 +380,7 @@ export default function CourseEditorPage() {
         price: number
         thumbnail_url: string | null
         level: CourseLevel
-        status?: "draft" | "pending"
+        status?: "draft" | "pending_review"
       } = {
         title: courseForm.title.trim(),
         category: courseForm.category,
@@ -326,7 +392,7 @@ export default function CourseEditorPage() {
 
       if (isNewCourse) {
         payload.status = "draft"
-      } else if (!course || course.status === "draft" || course.status === "pending" || course.status === "rejected") {
+      } else if (!course || course.status === "draft" || course.status === "pending" || course.status === "pending_review" || course.status === "rejected") {
         payload.status = courseForm.status
       }
 
@@ -340,8 +406,12 @@ export default function CourseEditorPage() {
           method: "POST",
           body: JSON.stringify(payload),
         })
+        const savedCourse = thumbnailFile ? await uploadCourseThumbnail(result.data.id, thumbnailFile) : result.data
+        setThumbnailFile(null)
+        setCourse(savedCourse)
+        setCourseForm(toForm(savedCourse))
         setMessage("Đã lưu khóa học thành bản nháp. Bạn có thể thêm bài giảng và câu hỏi.")
-        router.replace(`/instructor/course/${result.data.id}`)
+        router.replace(`/instructor/course/${savedCourse.id}`)
         return
       }
 
@@ -349,13 +419,93 @@ export default function CourseEditorPage() {
         method: "PATCH",
         body: JSON.stringify(payload),
       })
-      setCourse(result.data)
-      setCourseForm(toForm(result.data))
+      const savedCourse = thumbnailFile ? await uploadCourseThumbnail(result.data.id, thumbnailFile) : result.data
+      setThumbnailFile(null)
+      setCourse(savedCourse)
+      setCourseForm(toForm(savedCourse))
       setMessage("Đã lưu thông tin khóa học.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không lưu được khóa học")
     } finally {
       setSavingCourse(false)
+    }
+  }
+
+  function handleThumbnailFileChange(file: File | null) {
+    setError(null)
+    if (!file) {
+      setThumbnailFile(null)
+      return
+    }
+    const validationError = validateThumbnailFile(file)
+    if (validationError) {
+      setThumbnailFile(null)
+      setError(validationError)
+      return
+    }
+    setThumbnailFile(file)
+  }
+
+  async function uploadCourseThumbnail(courseId: number, file: File) {
+    const validationError = validateThumbnailFile(file)
+    if (validationError) {
+      throw new Error(validationError)
+    }
+    const formData = new FormData()
+    formData.append("file", file)
+    setUploadingThumbnail(true)
+    try {
+      const result = await apiFetch<Course>(`/courses/${courseId}/upload-thumbnail`, {
+        method: "POST",
+        body: formData,
+      })
+      return result.data
+    } finally {
+      setUploadingThumbnail(false)
+    }
+  }
+
+  async function handleSubmitVerification() {
+    try {
+      setSavingVerification(true)
+      setMessage(null)
+      setError(null)
+
+      if (
+        !verificationForm.full_name.trim() ||
+        !verificationForm.cccd_number.trim() ||
+        !verificationForm.major.trim() ||
+        !verificationForm.university_name.trim() ||
+        !verificationForm.graduation_year.trim() ||
+        !verificationForm.cccd_front_file ||
+        !verificationForm.cccd_back_file ||
+        !verificationForm.degree_file
+      ) {
+        setError("Vui lòng nhập đầy đủ thông tin và 3 file xác minh.")
+        return
+      }
+
+      const formData = new FormData()
+      formData.append("full_name", verificationForm.full_name.trim())
+      formData.append("cccd_number", verificationForm.cccd_number.trim())
+      formData.append("major", verificationForm.major.trim())
+      formData.append("university_name", verificationForm.university_name.trim())
+      formData.append("graduation_year", verificationForm.graduation_year.trim())
+      formData.append("cccd_front_file", verificationForm.cccd_front_file)
+      formData.append("cccd_back_file", verificationForm.cccd_back_file)
+      formData.append("degree_file", verificationForm.degree_file)
+
+      const result = await apiFetch<InstructorVerification>("/instructor-verifications", {
+        method: "POST",
+        body: formData,
+      })
+      setVerification(result.data)
+      setVerificationForm(emptyVerificationForm)
+      setMessage("Đã gửi hồ sơ xác minh giảng viên. Bạn có thể tạo khóa học sau khi admin duyệt.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không gửi được hồ sơ xác minh")
+    } finally {
+      setSavingVerification(false)
     }
   }
 
@@ -719,6 +869,50 @@ export default function CourseEditorPage() {
     )
   }
 
+  if (isNewCourse && verification?.status !== "approved") {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
+          <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+            <Button variant="ghost" asChild>
+              <Link href="/instructor/courses">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Quay lại
+              </Link>
+            </Button>
+            <LogoutButton variant="outline" />
+          </div>
+        </header>
+        <main className="mx-auto max-w-5xl p-4 lg:p-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Xác minh giảng viên</CardTitle>
+              <CardDescription>
+                Bạn cần có hồ sơ xác minh được admin duyệt trước khi tạo khóa học. Hồ sơ và các bằng cấp của bạn có thể xem, chỉnh sửa hoặc bổ sung tại trang xác minh.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {error && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
+              {verification?.status === "pending" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  Hồ sơ của bạn đang chờ admin duyệt.
+                </div>
+              )}
+              {verification?.status === "rejected" && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                  Lý do từ chối: {verification.admin_note || "Admin chưa nhập lý do."}
+                </div>
+              )}
+              <Button asChild>
+                <Link href="/instructor/verification">Mở hồ sơ xác minh</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
@@ -744,9 +938,9 @@ export default function CourseEditorPage() {
               variant="outline"
               className="hidden border-border bg-background text-foreground hover:bg-muted hover:text-foreground sm:inline-flex"
             />
-            <Button size="sm" onClick={handleSaveCourse} disabled={savingCourse}>
+            <Button size="sm" onClick={handleSaveCourse} disabled={savingCourse || uploadingThumbnail}>
               <Save className="mr-2 h-4 w-4" />
-              {savingCourse ? "Đang lưu..." : "Lưu khóa học"}
+              {savingCourse || uploadingThumbnail ? "Đang lưu..." : "Lưu khóa học"}
             </Button>
           </div>
         </div>
@@ -843,19 +1037,26 @@ export default function CourseEditorPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Ảnh đại diện URL</Label>
+                      <Label>Ảnh đại diện khóa học</Label>
                       <Input
-                        value={courseForm.thumbnail_url}
-                        onChange={(e) => setCourseForm((prev) => ({ ...prev, thumbnail_url: e.target.value }))}
-                        placeholder="https://..."
+                        type="file"
+                        accept={THUMBNAIL_ACCEPT}
+                        onChange={(e) => handleThumbnailFileChange(e.target.files?.[0] ?? null)}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        JPG, JPEG, PNG, WEBP; tối đa 5MB. Nếu không upload, hệ thống dùng ảnh mặc định theo lĩnh vực.
+                      </p>
+                      {courseForm.thumbnail_url && !thumbnailFile && (
+                        <p className="text-xs text-muted-foreground">Đang dùng ảnh riêng đã upload.</p>
+                      )}
+                      {thumbnailFile && <p className="text-xs text-primary">Đã chọn: {thumbnailFile.name}</p>}
                     </div>
 
                     <div className="space-y-2">
                       <Label>Trạng thái gửi duyệt</Label>
                       <Select
                         value={isNewCourse ? "draft" : courseForm.status}
-                        onValueChange={(value: "draft" | "pending") => setCourseForm((prev) => ({ ...prev, status: value }))}
+                        onValueChange={(value: "draft" | "pending_review") => setCourseForm((prev) => ({ ...prev, status: value }))}
                         disabled={isNewCourse}
                       >
                         <SelectTrigger className="w-full">
@@ -863,7 +1064,7 @@ export default function CourseEditorPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="draft">Lưu bản nháp</SelectItem>
-                          <SelectItem value="pending">Gửi admin duyệt</SelectItem>
+                          <SelectItem value="pending_review">Gửi admin duyệt</SelectItem>
                         </SelectContent>
                       </Select>
                       {isNewCourse && (
@@ -875,7 +1076,7 @@ export default function CourseEditorPage() {
                   <div>
                     <div className="aspect-video overflow-hidden rounded-lg border bg-muted">
                       <img
-                        src={courseForm.thumbnail_url || "/placeholder.jpg"}
+                        src={thumbnailPreviewUrl || getCourseThumbnailUrl({ thumbnail_url: courseForm.thumbnail_url, category: courseForm.category })}
                         alt={courseForm.title || "Ảnh khóa học"}
                         className="h-full w-full object-cover"
                       />

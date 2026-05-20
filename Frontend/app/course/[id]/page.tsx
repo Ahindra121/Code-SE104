@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { clearAuth, getStoredToken, getStoredUser, LearnHubUser, redirectPathForRole } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -342,7 +343,7 @@ export default function CourseDetailPage() {
           <Card className="overflow-hidden">
             <div className="aspect-video bg-muted">
               <img
-                src={course.thumbnail_url || "/placeholder.jpg"}
+                src={getCourseThumbnailUrl(course)}
                 alt={course.title}
                 className="h-full w-full object-cover"
               />

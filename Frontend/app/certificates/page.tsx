@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { getStoredUser, redirectPathForRole } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -280,7 +281,7 @@ export default function CertificatesPage() {
               <Card key={cert.id} className="overflow-hidden transition-shadow hover:shadow-lg">
                 <div className="relative aspect-video bg-muted">
                   <img
-                    src={cert.course?.thumbnail_url || "/placeholder.jpg"}
+                    src={getCourseThumbnailUrl(cert.course)}
                     alt={cert.course?.title || cert.certificate_code}
                     className="h-full w-full object-cover"
                   />

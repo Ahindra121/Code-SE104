@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, type ReactNode } from "react"
 import Link from "next/link"
@@ -15,13 +15,15 @@ import {
   Shield,
   BarChart3,
   BookOpen,
+  BadgeCheck,
 } from "lucide-react"
 
-type AdminSectionKey = "dashboard" | "users" | "courses" | "reports" | "analytics" | "settings"
+type AdminSectionKey = "dashboard" | "users" | "verifications" | "courses" | "reports" | "analytics" | "settings"
 
 const sidebarItems = [
   { key: "dashboard", name: "Bảng điều khiển", icon: Home, href: "/admin" },
   { key: "users", name: "Người dùng", icon: Users, href: "/admin/users" },
+  { key: "verifications", name: "Xác minh GV", icon: BadgeCheck, href: "/admin/instructor-verifications" },
   { key: "courses", name: "Khóa học", icon: BookOpen, href: "/admin/courses" },
   { key: "reports", name: "Báo cáo", icon: FileText, href: "/admin/reports" },
   { key: "analytics", name: "Phân tích", icon: BarChart3, href: "/admin/analytics" },
@@ -130,3 +132,4 @@ export function AdminShell({
     </div>
   )
 }
+

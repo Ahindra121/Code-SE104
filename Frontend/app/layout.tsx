@@ -9,23 +9,9 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'LearnHub - Nền tảng học trực tuyến',
   description: 'Học mọi lúc, mọi nơi với LearnHub. Truy cập hàng nghìn khóa học về CNTT, Kinh doanh, Ngoại ngữ và Kỹ năng mềm.',
-  generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/Avatar_Web.png',
+    apple: '/Avatar_Web.png',
   },
 }
 

@@ -1,15 +1,31 @@
+import unicodedata
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.dependencies.auth import get_optional_current_user, require_roles
-from app.models.entities import Course, CourseDeletionRequest, CourseDeletionRequestStatus, CourseStatus, Enrollment, EnrollmentStatus, User, UserRole
+from app.models.entities import (
+    Course,
+    CourseDeletionRequest,
+    CourseDeletionRequestStatus,
+    CourseStatus,
+    Enrollment,
+    EnrollmentStatus,
+    InstructorVerification,
+    InstructorVerificationStatus,
+    InstructorQualificationStatus,
+    User,
+    UserRole,
+)
 from app.schemas.common import ok
 from app.schemas.course import (
     CourseCreate,
+    CourseReject,
     CourseDeletionRequestCreate,
     CourseDeletionRequestOut,
     CourseDeletionReview,
@@ -21,6 +37,10 @@ from app.services.course_service import assert_course_owner, course_to_out
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 CONTENT_RESTORE_DAYS = 30
+REVIEW_STATUSES = [CourseStatus.pending, CourseStatus.pending_review]
+UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
+THUMBNAIL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024
 
 
 def _now() -> datetime:
@@ -42,6 +62,52 @@ def _active_student_count(db: Session, course_id: int) -> int:
             Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
         )
     ) or 0
+
+
+def _safe_filename(filename: str) -> str:
+    normalized = unicodedata.normalize("NFKD", Path(filename).name)
+    ascii_name = normalized.encode("ascii", "ignore").decode("ascii").replace(" ", "_")
+    return "".join(char for char in ascii_name if char.isalnum() or char in "._-") or "thumbnail"
+
+
+def _delete_upload(url: str | None) -> None:
+    if not url or not url.startswith("/uploads/"):
+        return
+    path = (UPLOAD_ROOT.parent / url.lstrip("/")).resolve()
+    if UPLOAD_ROOT not in path.parents:
+        return
+    if path.is_file():
+        path.unlink(missing_ok=True)
+
+
+async def _save_thumbnail(file: UploadFile, course_id: int) -> str:
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in THUMBNAIL_EXTENSIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Anh dai dien khoa hoc chi ho tro JPG, JPEG, PNG hoac WEBP")
+
+    upload_dir = UPLOAD_ROOT / "courses" / f"course_{course_id}" / "thumbnail"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    destination = upload_dir / f"{uuid4().hex}_{_safe_filename(file.filename or f'thumbnail{extension}')}"
+
+    size = 0
+    try:
+        with destination.open("wb") as output:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_THUMBNAIL_SIZE:
+                    output.close()
+                    destination.unlink(missing_ok=True)
+                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Anh dai dien khoa hoc toi da 5MB")
+                output.write(chunk)
+    except HTTPException:
+        raise
+    except OSError as exc:
+        destination.unlink(missing_ok=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload anh dai dien khoa hoc that bai") from exc
+    finally:
+        await file.close()
+
+    return "/" + destination.relative_to(UPLOAD_ROOT.parent).as_posix()
 
 
 def _can_view_deleted_course(db: Session, course: Course, user: User | None) -> bool:
@@ -113,7 +179,21 @@ def my_courses(db: Session = Depends(get_db), current_user: User = Depends(requi
 
 @router.post("")
 def create_course(payload: CourseCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.instructor))):
-    course = Course(**payload.model_dump(), instructor_id=current_user.id)
+    verification = db.scalar(
+        select(InstructorVerification).where(
+            InstructorVerification.user_id == current_user.id,
+            InstructorVerification.status == InstructorVerificationStatus.approved,
+        )
+    )
+    if not verification:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ban can xac minh giang vien truoc khi tao khoa hoc.",
+        )
+    values = payload.model_dump()
+    if values.get("status") == CourseStatus.pending:
+        values["status"] = CourseStatus.pending_review
+    course = Course(**values, instructor_id=current_user.id)
     db.add(course)
     db.commit()
     db.refresh(course)
@@ -130,6 +210,15 @@ def get_course(
         select(Course).options(joinedload(Course.instructor), joinedload(Course.lessons)).where(Course.id == course_id)
     ).unique().first()
     if not course or (course.is_deleted and not _can_view_deleted_course(db, course, current_user)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    can_view_unapproved = bool(
+        current_user
+        and (
+            current_user.role == UserRole.admin
+            or (current_user.role == UserRole.instructor and course.instructor_id == current_user.id)
+        )
+    )
+    if course.status != CourseStatus.approved and not can_view_unapproved:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     return ok(course_to_out(db, course))
 
@@ -148,10 +237,33 @@ def update_course(
     if payload.status in [CourseStatus.approved, CourseStatus.rejected]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admin can approve or reject courses")
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "status" and value == CourseStatus.pending:
+            value = CourseStatus.pending_review
         setattr(course, field, value)
     db.commit()
     db.refresh(course)
     return ok(course_to_out(db, course), "Course updated")
+
+
+@router.post("/{course_id}/upload-thumbnail")
+async def upload_course_thumbnail(
+    course_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.instructor, UserRole.admin)),
+):
+    course = db.get(Course, course_id)
+    if not course or course.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if current_user.role == UserRole.instructor:
+        assert_course_owner(course, current_user)
+
+    old_url = course.thumbnail_url
+    course.thumbnail_url = await _save_thumbnail(file, course.id)
+    _delete_upload(old_url)
+    db.commit()
+    db.refresh(course)
+    return ok(course_to_out(db, course), "Course thumbnail uploaded")
 
 
 @router.delete("/{course_id}")
@@ -220,7 +332,7 @@ def moderate_course(
     course_id: int,
     payload: CourseModeration,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles(UserRole.admin)),
+    current_user: User = Depends(require_roles(UserRole.admin)),
 ):
     if payload.status not in [CourseStatus.approved, CourseStatus.rejected]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin can only approve or reject courses")
@@ -231,9 +343,118 @@ def moderate_course(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     course.status = payload.status
     course.rejection_reason = payload.rejection_reason if payload.status == CourseStatus.rejected else None
+    course.reviewed_by_id = current_user.id
+    course.reviewed_at = _now()
     db.commit()
     db.refresh(course)
     return ok(course_to_out(db, course), "Course moderation updated")
+
+
+admin_router = APIRouter(prefix="/admin/courses", tags=["Admin Courses"])
+
+
+@admin_router.get("")
+def list_admin_courses(
+    status: CourseStatus | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.admin)),
+):
+    filters = [Course.is_deleted.is_(False)]
+    if status:
+        filters.append(Course.status == status)
+    courses = db.scalars(
+        select(Course)
+        .options(joinedload(Course.instructor), joinedload(Course.lessons))
+        .where(and_(*filters))
+        .order_by(Course.updated_at.desc())
+    ).unique().all()
+    return ok([course_to_out(db, course) for course in courses])
+
+
+@admin_router.get("/{course_id}/review-info")
+def get_course_review_info(course_id: int, db: Session = Depends(get_db), _: User = Depends(require_roles(UserRole.admin))):
+    course = db.scalars(
+        select(Course).options(joinedload(Course.instructor), joinedload(Course.lessons)).where(Course.id == course_id)
+    ).unique().first()
+    if not course or course.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    verification = db.scalars(
+        select(InstructorVerification).options(joinedload(InstructorVerification.qualifications)).where(
+            InstructorVerification.user_id == course.instructor_id,
+            InstructorVerification.status == InstructorVerificationStatus.approved,
+        )
+    ).unique().first()
+    verification_data = None
+    if verification:
+        approved_qualifications = [
+            {
+                "id": qualification.id,
+                "major": qualification.major,
+                "university_name": qualification.university_name,
+                "graduation_year": qualification.graduation_year,
+                "degree_url": qualification.degree_url,
+                "status": qualification.status,
+            }
+            for qualification in verification.qualifications
+            if qualification.status == InstructorQualificationStatus.approved
+        ]
+        verification_data = {
+            "id": verification.id,
+            "status": verification.status,
+            "major": verification.major,
+            "university_name": verification.university_name,
+            "graduation_year": verification.graduation_year,
+            "degree_url": verification.degree_url,
+            "cccd_front_url": verification.cccd_front_url,
+            "cccd_back_url": verification.cccd_back_url,
+            "admin_note": verification.admin_note,
+            "qualifications": approved_qualifications,
+        }
+    qualifications = verification_data["qualifications"] if verification_data else []
+    primary_qualification = qualifications[0] if qualifications else None
+    return ok(
+        {
+            "course": course_to_out(db, course),
+            "instructor": course_to_out(db, course).instructor,
+            "instructor_verification": verification_data,
+            "major": ", ".join(item["major"] for item in qualifications) if qualifications else (verification.major if verification else None),
+            "degree_url": primary_qualification["degree_url"] if primary_qualification else (verification.degree_url if verification else None),
+            "category": course.category,
+        }
+    )
+
+
+@admin_router.patch("/{course_id}/approve")
+def approve_course(course_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles(UserRole.admin))):
+    course = db.get(Course, course_id)
+    if not course or course.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    course.status = CourseStatus.approved
+    course.rejection_reason = None
+    course.reviewed_by_id = current_user.id
+    course.reviewed_at = _now()
+    db.commit()
+    db.refresh(course)
+    return ok(course_to_out(db, course), "Course approved")
+
+
+@admin_router.patch("/{course_id}/reject")
+def reject_course(
+    course_id: int,
+    payload: CourseReject,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.admin)),
+):
+    course = db.get(Course, course_id)
+    if not course or course.is_deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    course.status = CourseStatus.rejected
+    course.rejection_reason = payload.admin_note
+    course.reviewed_by_id = current_user.id
+    course.reviewed_at = _now()
+    db.commit()
+    db.refresh(course)
+    return ok(course_to_out(db, course), "Course rejected")
 
 
 @router.get("/deletion-requests/pending")

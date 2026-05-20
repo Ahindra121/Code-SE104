@@ -3,6 +3,8 @@ from app.models.entities import (
     Certificate,
     Course,
     Enrollment,
+    InstructorQualification,
+    InstructorVerification,
     Lesson,
     LearningProgress,
     Question,
@@ -17,6 +19,8 @@ __all__ = [
     "Certificate",
     "Course",
     "Enrollment",
+    "InstructorQualification",
+    "InstructorVerification",
     "Lesson",
     "LearningProgress",
     "Question",
@@ -25,4 +29,3 @@ __all__ = [
     "Review",
     "User",
 ]
-

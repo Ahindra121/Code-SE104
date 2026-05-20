@@ -47,10 +47,23 @@ class CourseLevel(str, enum.Enum):
 class CourseStatus(str, enum.Enum):
     draft = "draft"
     pending = "pending"
+    pending_review = "pending_review"
     approved = "approved"
     rejected = "rejected"
     hidden = "hidden"
     archived = "archived"
+
+
+class InstructorVerificationStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
+class InstructorQualificationStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
 
 
 class EnrollmentStatus(str, enum.Enum):
@@ -89,7 +102,7 @@ class User(Base, TimestampMixin):
     admin_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     admin_locked_reason: Mapped[str | None] = mapped_column(Text)
 
-    courses: Mapped[list["Course"]] = relationship(back_populates="instructor")
+    courses: Mapped[list["Course"]] = relationship(back_populates="instructor", foreign_keys="Course.instructor_id")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
     progress_records: Mapped[list["LearningProgress"]] = relationship(back_populates="student")
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(back_populates="student")
@@ -97,6 +110,9 @@ class User(Base, TimestampMixin):
     reviews: Mapped[list["Review"]] = relationship(back_populates="student")
     reactivation_requests: Mapped[list["ReactivationRequest"]] = relationship(
         back_populates="user", foreign_keys="ReactivationRequest.user_id", cascade="all, delete-orphan"
+    )
+    instructor_verification: Mapped["InstructorVerification | None"] = relationship(
+        back_populates="user", foreign_keys="InstructorVerification.user_id", cascade="all, delete-orphan", uselist=False
     )
 
 
@@ -136,8 +152,11 @@ class Course(Base, TimestampMixin):
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    instructor: Mapped[User] = relationship(back_populates="courses")
+    instructor: Mapped[User] = relationship(back_populates="courses", foreign_keys=[instructor_id])
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
     lessons: Mapped[list["Lesson"]] = relationship(back_populates="course", cascade="all, delete-orphan")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="course")
     progress_records: Mapped[list["LearningProgress"]] = relationship(back_populates="course")
@@ -147,6 +166,64 @@ class Course(Base, TimestampMixin):
     deletion_requests: Mapped[list["CourseDeletionRequest"]] = relationship(
         back_populates="course", cascade="all, delete-orphan"
     )
+
+
+class InstructorVerification(Base, TimestampMixin):
+    __tablename__ = "instructor_verifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    cccd_number: Mapped[str] = mapped_column(String(30), nullable=False)
+    cccd_front_url: Mapped[str] = mapped_column(String(600), nullable=False)
+    cccd_back_url: Mapped[str] = mapped_column(String(600), nullable=False)
+    degree_url: Mapped[str] = mapped_column(String(600), nullable=False)
+    major: Mapped[str] = mapped_column(String(255), nullable=False)
+    university_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    graduation_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[InstructorVerificationStatus] = mapped_column(
+        Enum(InstructorVerificationStatus, name="instructor_verification_status"),
+        nullable=False,
+        default=InstructorVerificationStatus.pending,
+    )
+    admin_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pending_full_name: Mapped[str | None] = mapped_column(String(255))
+    pending_cccd_number: Mapped[str | None] = mapped_column(String(30))
+    pending_cccd_front_url: Mapped[str | None] = mapped_column(String(600))
+    pending_cccd_back_url: Mapped[str | None] = mapped_column(String(600))
+    has_pending_changes: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="instructor_verification", foreign_keys=[user_id])
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
+    qualifications: Mapped[list["InstructorQualification"]] = relationship(
+        back_populates="verification", cascade="all, delete-orphan"
+    )
+
+
+class InstructorQualification(Base, TimestampMixin):
+    __tablename__ = "instructor_qualifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    verification_id: Mapped[int] = mapped_column(
+        ForeignKey("instructor_verifications.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    major: Mapped[str] = mapped_column(String(255), nullable=False)
+    university_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    graduation_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    degree_url: Mapped[str] = mapped_column(String(600), nullable=False)
+    status: Mapped[InstructorQualificationStatus] = mapped_column(
+        Enum(InstructorQualificationStatus, name="instructor_qualification_status"),
+        nullable=False,
+        default=InstructorQualificationStatus.pending,
+    )
+    admin_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    verification: Mapped[InstructorVerification] = relationship(back_populates="qualifications")
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])
 
 
 class CourseDeletionRequest(Base, TimestampMixin):

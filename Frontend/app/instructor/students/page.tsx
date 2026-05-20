@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { BarChart3, BookOpen, GraduationCap, Home, Mail, Menu, PlusCircle, Search, Settings, Users, X } from "lucide-react"
+import { BarChart3, BookOpen,
+  BadgeCheck, GraduationCap, Home, Mail, Menu, PlusCircle, Search, Settings, Users, X } from "lucide-react"
 
 type StudentRow = {
   id: number
@@ -22,7 +23,9 @@ type StudentRow = {
 
 const sidebarItems = [
   { name: "Bảng điều khiển", icon: Home, href: "/instructor", active: false },
-  { name: "Khóa học của tôi", icon: BookOpen, href: "/instructor/courses", active: false },
+  { name: "Khóa học của tôi", icon: BookOpen,
+  BadgeCheck, href: "/instructor/courses", active: false },
+  { name: "Xác minh giảng viên", icon: BadgeCheck, href: "/instructor/verification", active: false },
   { name: "Thêm khóa học", icon: PlusCircle, href: "/instructor/course/new", active: false },
   { name: "Phân tích", icon: BarChart3, href: "/instructor/analytics", active: false },
   { name: "Học viên", icon: Users, href: "/instructor/students", active: true },
@@ -167,3 +170,4 @@ export default function InstructorStudentsPage() {
     </div>
   )
 }
+

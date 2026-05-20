@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -212,7 +213,7 @@ export default function HomePage() {
             <div className="absolute -bottom-8 -left-8 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
             <div className="relative overflow-hidden rounded-2xl bg-card p-2 shadow-2xl ring-1 ring-border">
               <img
-                src={heroCourse?.thumbnail_url || "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=400&fit=crop"}
+                src={heroCourse ? getCourseThumbnailUrl(heroCourse) : "/images/course-defaults/it.png"}
                 alt={heroCourse?.title || "LearnHub"}
                 className="aspect-video w-full rounded-xl object-cover"
               />
@@ -299,7 +300,7 @@ export default function HomePage() {
                   <Card className="group h-full overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg">
                     <div className="relative aspect-video overflow-hidden">
                       <img
-                        src={course.thumbnail_url || "/placeholder.jpg"}
+                        src={getCourseThumbnailUrl(course)}
                         alt={course.title}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       />

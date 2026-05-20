@@ -1,17 +1,18 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AdminShell } from "../_components/admin-shell"
-import { apiFetch } from "@/lib/api"
-import { getStoredUser, redirectPathForRole } from "@/lib/auth"
+import { API_URL, apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
+import { getStoredToken, getStoredUser, redirectPathForRole } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Check, Eye, XCircle, BookOpen, Clock, UserRound } from "lucide-react"
 
-type CourseStatus = "draft" | "pending" | "approved" | "rejected" | "hidden" | "archived"
+type CourseStatus = "draft" | "pending" | "pending_review" | "approved" | "rejected" | "hidden" | "archived"
 
 type Course = {
   id: number
@@ -44,6 +45,17 @@ type CourseList = {
   page_size: number
 }
 
+type CourseReviewInfo = {
+  major?: string | null
+  degree_url?: string | null
+  instructor_verification?: {
+    id: number
+    major?: string | null
+    degree_url?: string | null
+    qualifications?: { id: number; major: string; university_name: string; graduation_year: number }[]
+  } | null
+}
+
 function instructorName(course: Course) {
   return course.instructor?.full_name || course.instructor?.username || `Instructor #${course.instructor_id}`
 }
@@ -52,6 +64,7 @@ function statusLabel(status: CourseStatus) {
   const labels: Record<CourseStatus, string> = {
     draft: "Bản nháp",
     pending: "Chờ duyệt",
+    pending_review: "Chờ duyệt",
     approved: "Đã duyệt",
     rejected: "Từ chối",
     hidden: "Đã ẩn",
@@ -67,11 +80,22 @@ function statusClass(status: CourseStatus) {
   return "bg-muted text-muted-foreground hover:bg-muted"
 }
 
+async function openQualificationFile(verificationId: number, qualificationId: number) {
+  const token = getStoredToken()
+  const response = await fetch(`${API_URL}/instructor-verifications/${verificationId}/qualification-files/${qualificationId}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!response.ok) throw new Error("Không mở được file bằng cấp")
+  const blob = await response.blob()
+  window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer")
+}
+
 export default function AdminCoursesPage() {
   const router = useRouter()
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState<number | null>(null)
+  const [reviewInfos, setReviewInfos] = useState<Record<number, CourseReviewInfo>>({})
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -94,8 +118,20 @@ export default function AdminCoursesPage() {
     try {
       setLoading(true)
       setError(null)
-      const result = await apiFetch<CourseList>("/courses?include_all=true&page_size=100")
-      setCourses(result.data.items)
+      const result = await apiFetch<Course[]>("/admin/courses")
+      setCourses(result.data)
+      const pending = result.data.filter((course) => course.status === "pending" || course.status === "pending_review")
+      const infoEntries = await Promise.all(
+        pending.map(async (course) => {
+          try {
+            const info = await apiFetch<CourseReviewInfo>(`/admin/courses/${course.id}/review-info`)
+            return [course.id, info.data] as const
+          } catch {
+            return [course.id, null] as const
+          }
+        })
+      )
+      setReviewInfos(Object.fromEntries(infoEntries.filter((entry): entry is readonly [number, CourseReviewInfo] => Boolean(entry[1]))))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được danh sách khóa học")
     } finally {
@@ -115,9 +151,9 @@ export default function AdminCoursesPage() {
         if (!rejection_reason) return
       }
 
-      const result = await apiFetch<Course>(`/courses/${courseId}/moderation`, {
+      const result = await apiFetch<Course>(`/admin/courses/${courseId}/${status === "approved" ? "approve" : "reject"}`, {
         method: "PATCH",
-        body: JSON.stringify({ status, rejection_reason }),
+        body: status === "rejected" ? JSON.stringify({ admin_note: rejection_reason }) : undefined,
       })
 
       setCourses((prev) => prev.map((course) => (course.id === courseId ? result.data : course)))
@@ -129,7 +165,7 @@ export default function AdminCoursesPage() {
     }
   }
 
-  const pendingCourses = useMemo(() => courses.filter((course) => course.status === "pending"), [courses])
+  const pendingCourses = useMemo(() => courses.filter((course) => course.status === "pending" || course.status === "pending_review"), [courses])
   const approvedCourses = useMemo(() => courses.filter((course) => course.status === "approved"), [courses])
   const rejectedCourses = useMemo(() => courses.filter((course) => course.status === "rejected"), [courses])
 
@@ -191,7 +227,7 @@ export default function AdminCoursesPage() {
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <div className="flex min-w-0 gap-4">
                       <img
-                        src={course.thumbnail_url || "/placeholder.jpg"}
+                        src={getCourseThumbnailUrl(course)}
                         alt={course.title}
                         className="hidden h-24 w-36 rounded-lg object-cover sm:block"
                       />
@@ -214,6 +250,25 @@ export default function AdminCoursesPage() {
                             <Clock className="h-4 w-4" />
                             Gửi {new Date(course.updated_at).toLocaleDateString("vi-VN")}
                           </span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                          <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground">
+                            Chuyên ngành GV: {reviewInfos[course.id]?.major || "Chưa có"}
+                          </span>
+                          {reviewInfos[course.id]?.instructor_verification?.qualifications?.[0] && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                openQualificationFile(
+                                  reviewInfos[course.id]!.instructor_verification!.id,
+                                  reviewInfos[course.id]!.instructor_verification!.qualifications![0].id
+                                )
+                              }
+                            >
+                              Xem bằng cấp
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -278,3 +333,4 @@ export default function AdminCoursesPage() {
     </AdminShell>
   )
 }
+

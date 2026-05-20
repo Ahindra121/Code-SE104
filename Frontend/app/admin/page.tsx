@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -18,7 +18,7 @@ type AdminReport = {
   certificates: number
 }
 
-type CourseStatus = "draft" | "pending" | "approved" | "rejected" | "hidden" | "archived"
+type CourseStatus = "draft" | "pending" | "pending_review" | "approved" | "rejected" | "hidden" | "archived"
 
 type Course = {
   id: number
@@ -45,6 +45,7 @@ function statusLabel(status: CourseStatus) {
   const labels: Record<CourseStatus, string> = {
     draft: "Bản nháp",
     pending: "Chờ duyệt",
+    pending_review: "Chờ duyệt",
     approved: "Đã duyệt",
     rejected: "Từ chối",
     hidden: "Đã ẩn",
@@ -101,7 +102,7 @@ export default function AdminDashboard() {
     loadDashboard()
   }, [router])
 
-  const pendingCourses = useMemo(() => courses.filter((course) => course.status === "pending"), [courses])
+  const pendingCourses = useMemo(() => courses.filter((course) => course.status === "pending" || course.status === "pending_review"), [courses])
   const approvedCourses = useMemo(() => courses.filter((course) => course.status === "approved"), [courses])
   const rejectedCourses = useMemo(() => courses.filter((course) => course.status === "rejected"), [courses])
 
@@ -237,3 +238,6 @@ export default function AdminDashboard() {
     </AdminShell>
   )
 }
+
+
+

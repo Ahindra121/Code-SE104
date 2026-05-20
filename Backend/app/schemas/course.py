@@ -34,6 +34,10 @@ class CourseModeration(BaseModel):
     rejection_reason: str | None = None
 
 
+class CourseReject(BaseModel):
+    admin_note: str = Field(..., min_length=1, max_length=2000)
+
+
 class CourseDeletionRequestCreate(BaseModel):
     reason: str = Field(..., min_length=10, max_length=2000)
 
@@ -80,6 +84,8 @@ class CourseOut(CourseBase):
     is_deleted: bool
     deleted_at: datetime | None
     rejection_reason: str | None
+    reviewed_by_id: int | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     instructor: UserOut | None = None
@@ -94,3 +100,12 @@ class CourseListOut(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class CourseReviewInfo(BaseModel):
+    course: CourseOut
+    instructor: UserOut | None
+    instructor_verification: dict | None
+    major: str | None
+    degree_url: str | None
+    category: str

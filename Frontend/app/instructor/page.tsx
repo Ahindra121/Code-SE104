@@ -1,9 +1,10 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { getStoredUser, redirectPathForRole, roleLabel } from "@/lib/auth"
 import { LogoutButton } from "@/components/logout-button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -13,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   BarChart3,
   BookOpen,
+  BadgeCheck,
   Edit,
   Eye,
   GraduationCap,
@@ -26,7 +28,7 @@ import {
   X,
 } from "lucide-react"
 
-type CourseStatus = "draft" | "pending" | "approved" | "rejected" | "hidden" | "archived"
+type CourseStatus = "draft" | "pending" | "pending_review" | "approved" | "rejected" | "hidden" | "archived"
 
 type Course = {
   id: number
@@ -50,7 +52,9 @@ type InstructorReportItem = {
 
 const sidebarItems = [
   { name: "Bảng điều khiển", icon: Home, href: "/instructor", active: true },
-  { name: "Khóa học của tôi", icon: BookOpen, href: "/instructor/courses", active: false },
+  { name: "Khóa học của tôi", icon: BookOpen,
+  BadgeCheck, href: "/instructor/courses", active: false },
+  { name: "Xác minh giảng viên", icon: BadgeCheck, href: "/instructor/verification", active: false },
   { name: "Thêm khóa học", icon: PlusCircle, href: "/instructor/course/new", active: false },
   { name: "Phân tích", icon: BarChart3, href: "/instructor/analytics", active: false },
   { name: "Học viên", icon: Users, href: "/instructor/students", active: false },
@@ -61,6 +65,7 @@ function statusLabel(status: CourseStatus) {
   const labels: Record<CourseStatus, string> = {
     draft: "Bản nháp",
     pending: "Chờ duyệt",
+    pending_review: "Chờ duyệt",
     approved: "Đã duyệt",
     rejected: "Từ chối",
     hidden: "Đã ẩn",
@@ -290,7 +295,7 @@ export default function InstructorDashboard() {
                       <tr key={course.id} className="border-b border-border last:border-0 hover:bg-muted/50">
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
-                            <img src={course.thumbnail_url || "/placeholder.jpg"} alt={course.title} className="h-12 w-20 rounded-lg object-cover" />
+                            <img src={getCourseThumbnailUrl(course)} alt={course.title} className="h-12 w-20 rounded-lg object-cover" />
                             <div>
                               <p className="line-clamp-1 font-medium text-foreground">{course.title}</p>
                               <p className="text-sm text-muted-foreground">{course.lessons_count} bài học</p>
@@ -367,3 +372,6 @@ export default function InstructorDashboard() {
     </div>
   )
 }
+
+
+

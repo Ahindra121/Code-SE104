@@ -39,6 +39,7 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { getStoredUser, redirectPathForRole } from "@/lib/auth"
 
 type BackendCourse = {
@@ -266,7 +267,7 @@ function mapBackendCourse(course: BackendCourse) {
     id: course.id,
     title: course.title,
     instructor: course.instructor?.full_name || course.instructor?.username || "LearnHub Instructor",
-    image: course.thumbnail_url || "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=400&h=225&fit=crop",
+    image: getCourseThumbnailUrl(course),
     rating: course.rating || 0,
     reviews: course.reviews_count || 0,
     students: course.students_count || 0,

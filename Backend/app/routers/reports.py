@@ -139,7 +139,15 @@ def admin_report(db: Session = Depends(get_db), _: User = Depends(require_roles(
     pending_reactivations = db.scalar(
         select(func.count(ReactivationRequest.id)).where(ReactivationRequest.status == ReactivationRequestStatus.pending)
     ) or 0
-    pending_courses = db.scalar(select(func.count(Course.id)).where(Course.status == CourseStatus.pending, Course.is_deleted.is_(False))) or 0
+    pending_courses = (
+        db.scalar(
+            select(func.count(Course.id)).where(
+                Course.status.in_([CourseStatus.pending, CourseStatus.pending_review]),
+                Course.is_deleted.is_(False),
+            )
+        )
+        or 0
+    )
     return ok({
         "users": db.scalar(select(func.count(User.id))) or 0,
         "instructors": db.scalar(select(func.count(User.id)).where(User.role == UserRole.instructor)) or 0,

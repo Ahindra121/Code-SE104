@@ -1,9 +1,10 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
+import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { getStoredUser, redirectPathForRole, roleLabel } from "@/lib/auth"
 import { LogoutButton } from "@/components/logout-button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import {
   BarChart3,
   BookOpen,
+  BadgeCheck,
   Edit,
   Eye,
   Filter,
@@ -29,7 +31,7 @@ import {
   X,
 } from "lucide-react"
 
-type CourseStatus = "draft" | "pending" | "approved" | "rejected" | "hidden" | "archived"
+type CourseStatus = "draft" | "pending" | "pending_review" | "approved" | "rejected" | "hidden" | "archived"
 
 type Course = {
   id: number
@@ -52,7 +54,9 @@ type Course = {
 
 const sidebarItems = [
   { name: "Bảng điều khiển", icon: Home, href: "/instructor", active: false },
-  { name: "Khóa học của tôi", icon: BookOpen, href: "/instructor/courses", active: true },
+  { name: "Khóa học của tôi", icon: BookOpen,
+  BadgeCheck, href: "/instructor/courses", active: true },
+  { name: "Xác minh giảng viên", icon: BadgeCheck, href: "/instructor/verification", active: false },
   { name: "Thêm khóa học", icon: PlusCircle, href: "/instructor/course/new", active: false },
   { name: "Phân tích", icon: BarChart3, href: "/instructor/analytics", active: false },
   { name: "Học viên", icon: Users, href: "/instructor/students", active: false },
@@ -63,6 +67,7 @@ function statusLabel(status: CourseStatus) {
   const labels: Record<CourseStatus, string> = {
     draft: "Bản nháp",
     pending: "Chờ duyệt",
+    pending_review: "Chờ duyệt",
     approved: "Đã duyệt",
     rejected: "Từ chối",
     hidden: "Đã ẩn",
@@ -192,7 +197,7 @@ export default function InstructorCoursesPage() {
 
   const approvedCourses = courses.filter((course) => course.status === "approved").length
   const draftCourses = courses.filter((course) => course.status === "draft").length
-  const pendingCourses = courses.filter((course) => course.status === "pending").length
+  const pendingCourses = courses.filter((course) => course.status === "pending" || course.status === "pending_review").length
 
   async function handleRestoreCourse(course: Course) {
     try {
@@ -347,7 +352,7 @@ export default function InstructorCoursesPage() {
                       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                         <div className="flex min-w-0 items-center gap-4">
                           <img
-                            src={course.thumbnail_url || "/placeholder.jpg"}
+                            src={getCourseThumbnailUrl(course)}
                             alt={course.title}
                             className="h-20 w-32 rounded-lg object-cover"
                           />
@@ -435,3 +440,6 @@ export default function InstructorCoursesPage() {
     </div>
   )
 }
+
+
+

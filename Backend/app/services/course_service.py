@@ -32,6 +32,8 @@ def course_to_out(db: Session, course: Course) -> CourseOut:
         is_deleted=course.is_deleted,
         deleted_at=course.deleted_at,
         rejection_reason=course.rejection_reason,
+        reviewed_by_id=course.reviewed_by_id,
+        reviewed_at=course.reviewed_at,
         created_at=course.created_at,
         updated_at=course.updated_at,
         instructor=UserOut.model_validate(course.instructor) if course.instructor else None,
