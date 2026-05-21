@@ -7,6 +7,7 @@
 __pycache__/
 *.py[cod]
 *.pyo
+.venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -18,9 +19,12 @@ Backend/uploads/
 # Node / Next.js
 node_modules/
 .next/
+.vercel/
 out/
 dist/
+coverage/
 *.tsbuildinfo
+Frontend/pnpm-lock.yaml
 
 # Logs and generated reports
 *.log

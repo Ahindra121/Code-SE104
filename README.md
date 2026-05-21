@@ -1,78 +1,278 @@
-# LearnHub Backend
+# LearnHub
 
-Backend FastAPI cho nền tảng khóa học trực tuyến. Code nằm riêng trong `Backend/` và không thay đổi frontend hiện có.
+LearnHub la ung dung hoc truc tuyen gom frontend Next.js va backend FastAPI. Repo nay duoc chuan hoa de nhom co the clone ve chay local, day code len GitHub va deploy theo mo hinh:
 
-## Công nghệ
+- Frontend: Vercel
+- Backend: Render hoac Railway
+- Database: Supabase PostgreSQL
+- Storage: Supabase Storage, neu can upload file ben vung
+- Source code: GitHub
 
-- FastAPI, SQLAlchemy, Alembic
+## Cong nghe
+
+Frontend:
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui style components
+
+Backend:
+
+- FastAPI
+- SQLAlchemy
+- Alembic
 - PostgreSQL
-- JWT access token
-- Passlib bcrypt
-- CORS cho Next.js frontend ở `localhost:3000`
+- JWT authentication
 
-## Chạy backend
+## Cau truc thu muc
 
-1. Tạo database PostgreSQL:
+```text
+.
+|-- Backend/
+|   |-- alembic/
+|   |-- app/
+|   |   |-- core/
+|   |   |-- dependencies/
+|   |   |-- models/
+|   |   |-- routers/
+|   |   |-- schemas/
+|   |   `-- services/
+|   |-- .env.example
+|   `-- requirements.txt
+|-- Frontend/
+|   |-- app/
+|   |-- components/
+|   |-- hooks/
+|   |-- lib/
+|   |-- public/
+|   |-- .env.example
+|   `-- package.json
+|-- .gitignore
+`-- README.md
+```
+
+## Chuan bi moi truong
+
+Can cai san:
+
+- Python 3.11+
+- Node.js 20+
+- PostgreSQL local hoac Supabase PostgreSQL
+- Git
+
+Khong commit cac file sau len GitHub:
+
+- `.env`, `.env.local`
+- `.venv/`
+- `node_modules/`
+- `.next/`
+- `__pycache__/`
+- `Backend/uploads/`
+- file log, cache, report sinh ra khi chay app
+
+## Chay backend local
+
+```powershell
+cd Backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+```
+
+Sua file `Backend/.env`:
+
+```env
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/learnhub
+SECRET_KEY=change-this-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+```
+
+Tao database local neu chua co:
 
 ```sql
 CREATE DATABASE learnhub;
 ```
 
-2. Cấu hình môi trường:
-
-```powershell
-cd Backend
-copy .env.example .env
-```
-
-Sửa `DATABASE_URL` và `SECRET_KEY` trong `.env`.
-
-3. Cài requirements:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-4. Chạy migration:
+Chay migration:
 
 ```powershell
 alembic upgrade head
 ```
 
-5. Tạo dữ liệu mẫu:
+Tao du lieu mau:
 
 ```powershell
-.\.venv\Scripts\python.exe -m app.seed
+python -m app.seed
 ```
 
-Tài khoản mẫu đều dùng mật khẩu `Demo@123`:
+Chay backend:
+
+```powershell
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Kiem tra:
+
+- API root: `http://127.0.0.1:8000/`
+- Swagger docs: `http://127.0.0.1:8000/docs`
+
+Tai khoan demo sau khi seed deu dung mat khau `Demo@123`:
 
 - `admin123`
 - `instructor123`
 - `student123`
 
-6. Chạy server:
+## Chay frontend local
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+cd Frontend
+npm install
+copy .env.example .env.local
+npm run dev
 ```
 
-Nếu terminal đang ở thư mục gốc đồ án `D:\Code SE104`, chạy:
+File `Frontend/.env.local` can tro den backend:
+
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
+```
+
+Mo frontend tai:
+
+```text
+http://localhost:3000
+```
+
+## Bien moi truong
+
+Backend:
+
+| Bien | Y nghia |
+| --- | --- |
+| `DATABASE_URL` | Connection string PostgreSQL dung cho SQLAlchemy |
+| `SECRET_KEY` | Khoa ky JWT, can thay bang chuoi dai va bi mat khi deploy |
+| `ALGORITHM` | Thuat toan JWT, mac dinh `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Thoi gian het han access token |
+| `CORS_ORIGINS` | Danh sach domain frontend duoc phep goi API |
+
+Frontend:
+
+| Bien | Y nghia |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | Base URL cua backend API, vi du `https://your-api.onrender.com/api` |
+
+## Deploy database tren Supabase
+
+1. Tao project tren Supabase.
+2. Vao Project Settings > Database de lay connection string.
+3. Dung URI dang PostgreSQL va them driver `postgresql+psycopg2://` cho backend.
+4. Dat `DATABASE_URL` nay vao Render/Railway.
+5. Chay migration production:
+
+```bash
+alembic upgrade head
+```
+
+Luu y: khong dua mat khau Supabase vao GitHub. Chi dat trong Environment Variables cua dich vu deploy.
+
+## Deploy backend tren Render
+
+Tao Web Service moi tu GitHub repo:
+
+- Root Directory: `Backend`
+- Runtime: Python
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+Environment Variables:
+
+```env
+DATABASE_URL=postgresql+psycopg2://...
+SECRET_KEY=your-production-secret
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=["https://your-frontend.vercel.app"]
+```
+
+Sau khi service co bien moi truong, chay migration cho database production bang shell cua Render/Railway:
+
+```bash
+alembic upgrade head
+```
+
+## Deploy backend tren Railway
+
+Tao service tu GitHub repo:
+
+- Root Directory: `Backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+Dat cac bien moi truong tuong tu Render. Railway thuong tien hon neu nhom muon quan ly service va logs nhanh.
+
+## Deploy frontend tren Vercel
+
+Tao project tu GitHub repo:
+
+- Framework Preset: Next.js
+- Root Directory: `Frontend`
+- Install Command: `npm install`
+- Build Command: `npm run build`
+
+Environment Variables:
+
+```env
+NEXT_PUBLIC_API_URL=https://your-backend-domain/api
+```
+
+Sau khi backend co domain that, cap nhat lai:
+
+- `NEXT_PUBLIC_API_URL` tren Vercel
+- `CORS_ORIGINS` tren backend de cho phep domain Vercel
+
+## Ghi chu ve upload file
+
+Hien backend co mount thu muc local `Backend/uploads` tai route `/uploads`. Cach nay dung duoc khi chay local, nhung khong phu hop cho deploy lau dai vi file tren Render/Railway co the mat khi service restart hoac redeploy.
+
+Neu app can upload video, tai lieu, anh khoa hoc hoac minh chung giang vien, nen chuyen sang Supabase Storage:
+
+1. Upload file tu backend len Supabase Storage.
+2. Luu public URL hoac storage path vao database.
+3. Frontend hien thi file bang URL da luu.
+4. Khong commit noi dung trong `Backend/uploads` len GitHub.
+
+## Quy trinh lam viec nhom
+
+Khuyen nghi:
+
+1. Moi thanh vien clone repo tu GitHub.
+2. Moi nguoi tao file `.env` rieng tu `.env.example`.
+3. Lam tinh nang tren branch rieng, vi du `feature/course-review`.
+4. Mo Pull Request vao `main`.
+5. Kiem tra frontend build va backend migration truoc khi merge.
+6. Deploy tu branch `main`.
+
+Lenh kiem tra nhanh truoc khi day code:
+
+```powershell
+cd Frontend
+npm run build
+```
 
 ```powershell
 cd Backend
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+alembic upgrade head
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Không nên chạy bằng lệnh `python` chung của máy nếu máy có nhiều Python, vì có thể trỏ nhầm sang Python của pgAdmin/PostgreSQL và thiếu thư viện backend.
+## API response
 
-Docs: `http://127.0.0.1:8000/docs`
-
-## Response JSON
-
-API trả về dạng thống nhất:
+Backend tra response thong nhat:
 
 ```json
 {
@@ -82,66 +282,4 @@ API trả về dạng thống nhất:
 }
 ```
 
-Lỗi cũng trả `success: false` kèm `message`.
-
-## Endpoint chính cho frontend
-
-- `POST /api/auth/register`: đăng ký `student` hoặc `instructor`
-- `POST /api/auth/login`: đăng nhập bằng `username` hoặc `email`
-- `GET /api/auth/me`: lấy user hiện tại
-- `PATCH /api/users/me`: cập nhật tài khoản
-- `GET /api/users`: admin xem danh sách user
-- `PATCH /api/users/{user_id}/status`: admin khóa/mở tài khoản
-- `GET /api/courses`: danh sách khóa học đã duyệt, hỗ trợ `keyword`, `category`, `min_price`, `max_price`, `level`
-- `GET /api/courses/{course_id}`: chi tiết khóa học
-- `GET /api/courses/mine`: instructor xem khóa học của mình
-- `POST /api/courses`: instructor tạo khóa học
-- `PATCH /api/courses/{course_id}`: instructor cập nhật khóa học của mình
-- `DELETE /api/courses/{course_id}`: instructor xóa mềm/ẩn khóa học
-- `PATCH /api/courses/{course_id}/moderation`: admin duyệt/từ chối khóa học
-- `GET /api/lessons/course/{course_id}`: danh sách bài học
-- `POST /api/lessons`: instructor thêm bài học
-- `GET /api/lessons/{lesson_id}`: xem bài học, yêu cầu ghi danh nếu là student
-- `POST /api/enrollments`: student ghi danh khóa học
-- `GET /api/enrollments/mine`: student xem khóa đã ghi danh
-- `PATCH /api/enrollments/{enrollment_id}/cancel`: hủy ghi danh nếu chưa học
-- `POST /api/progress`: cập nhật tiến độ học, tự hoàn thành nếu xem >= 90%
-- `GET /api/progress/course/{course_id}`: phần trăm hoàn thành khóa học
-- `GET /api/questions/lesson/{lesson_id}`: câu hỏi quiz; student không nhận đáp án đúng
-- `POST /api/questions`: instructor thêm câu hỏi
-- `POST /api/quizzes/submit`: student nộp quiz, điểm >= 5 là đạt
-- `POST /api/certificates/course/{course_id}`: cấp chứng chỉ nếu đủ điều kiện
-- `GET /api/certificates/mine`: chứng chỉ của student
-- `POST /api/reviews`: student đánh giá khóa học đã đăng ký
-- `GET /api/reviews/course/{course_id}`: danh sách đánh giá
-- `GET /api/reports/student`: thống kê cá nhân
-- `GET /api/reports/instructor`: thống kê khóa học của instructor
-- `GET /api/reports/admin`: thống kê toàn hệ thống
-
-## Ghi chú tích hợp frontend
-
-Frontend đã có `Frontend/.env.local` trỏ tới:
-
-```env
-NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
-```
-
-Các màn hình `login`, `register` và `search` đã bắt đầu gọi API backend thật. Login lưu token vào `localStorage` với key `learnhub-auth-token` và gửi header:
-
-```http
-Authorization: Bearer <access_token>
-```
-
-Để chạy thử liên kết FE/BE:
-
-```powershell
-# Terminal 1
-cd Backend
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-
-# Terminal 2
-cd Frontend
-npm run dev
-```
-
-Mở frontend tại `http://localhost:3000`, đăng nhập bằng `student123 / Demo@123`, rồi vào trang `/search` để thấy danh sách khóa học lấy từ backend. Các field khóa học backend đã có `title`, `category`, `description`, `price`, `thumbnail_url`, `level`, `rating`, `reviews_count`, `students_count`, `lessons_count`, `instructor` để map sang card khóa học hiện tại.
+Khi loi, API tra `success: false` kem `message` va `data` neu co.
