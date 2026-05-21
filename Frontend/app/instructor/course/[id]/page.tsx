@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ArrowLeft,
@@ -158,6 +159,19 @@ type FinalTestForm = {
   is_active: boolean
 }
 
+type CourseSettings = {
+  lesson_completion_percent: number
+  default_quiz_pass_score: number
+  final_test_pass_score: number
+  allow_quiz_retake: boolean
+  max_quiz_attempts: number
+  allow_final_test_retake: boolean
+  max_final_test_attempts: number
+  require_final_test: boolean
+}
+
+type UploadLimits = Record<string, string>
+
 type FinalTestQuestionForm = {
   question_text: string
   question_type: FinalQuestionType
@@ -205,15 +219,6 @@ type CourseReview = {
 }
 
 const categories = ["IT", "Business", "Language", "Soft Skills"]
-const THUMBNAIL_ACCEPT = ".jpg,.jpeg,.png,.webp"
-const VIDEO_ACCEPT = ".mp4,.webm,.mov"
-const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx"
-const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024
-const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
-const THUMBNAIL_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
-const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov"]
-const DOCUMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
 const levels: { value: CourseLevel; label: string }[] = [
   { value: "basic", label: "Cơ bản" },
   { value: "intermediate", label: "Trung bình" },
@@ -265,6 +270,28 @@ const emptyFinalTestForm: FinalTestForm = {
   is_active: true,
 }
 
+const emptyCourseSettings: CourseSettings = {
+  lesson_completion_percent: 90,
+  default_quiz_pass_score: 80,
+  final_test_pass_score: 80,
+  allow_quiz_retake: true,
+  max_quiz_attempts: 3,
+  allow_final_test_retake: true,
+  max_final_test_attempts: 3,
+  require_final_test: true,
+}
+
+const defaultUploadLimits: UploadLimits = {
+  max_video_size_mb: "100",
+  max_document_size_mb: "20",
+  max_thumbnail_size_mb: "5",
+  max_verification_file_size_mb: "10",
+  allowed_video_extensions: "mp4,webm,mov",
+  allowed_document_extensions: "pdf,doc,docx,ppt,pptx",
+  allowed_thumbnail_extensions: "jpg,jpeg,png,webp",
+  allowed_verification_extensions: "pdf,jpg,jpeg,png",
+}
+
 const emptyFinalQuestionForm: FinalTestQuestionForm = {
   question_text: "",
   question_type: "multiple_choice",
@@ -312,33 +339,17 @@ function toForm(course: Course): CourseForm {
   }
 }
 
-function fileExtension(file: File) {
-  return file.name.slice(file.name.lastIndexOf(".")).toLowerCase()
-}
-
-function validateUploadFile(file: File, type: "video" | "document") {
-  const isVideo = type === "video"
-  const allowedExtensions = isVideo ? VIDEO_EXTENSIONS : DOCUMENT_EXTENSIONS
-  const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_DOCUMENT_SIZE
-  const label = isVideo ? "Video" : "Tài liệu"
-
-  if (!allowedExtensions.includes(fileExtension(file))) {
-    return `${label} sai định dạng file`
-  }
-  if (file.size > maxSize) {
-    return `${label} vượt quá ${isVideo ? "100MB" : "20MB"}`
-  }
+function validateUploadFile(_file: File, _type: "video" | "document") {
   return null
 }
 
-function validateThumbnailFile(file: File) {
-  if (!THUMBNAIL_EXTENSIONS.includes(fileExtension(file))) {
-    return "Ảnh đại diện chỉ hỗ trợ JPG, JPEG, PNG hoặc WEBP"
-  }
-  if (file.size > MAX_THUMBNAIL_SIZE) {
-    return "Ảnh đại diện vượt quá 5MB"
-  }
+function validateThumbnailFile(_file: File) {
   return null
+}
+
+function uploadRuleText(limits: UploadLimits, maxKey: string, extensionsKey: string) {
+  const extensions = (limits[extensionsKey] || "").split(",").map((item) => item.trim()).filter(Boolean).join(", ")
+  return `${extensions || "Theo cài đặt hệ thống"}; tối đa ${limits[maxKey] || "?"}MB.`
 }
 
 function assetUrl(url?: string | null) {
@@ -366,6 +377,8 @@ export default function CourseEditorPage() {
   const [questionForm, setQuestionForm] = useState<QuestionForm>(emptyQuestionForm)
   const [finalTest, setFinalTest] = useState<FinalTest | null>(null)
   const [finalTestForm, setFinalTestForm] = useState<FinalTestForm>(emptyFinalTestForm)
+  const [courseSettings, setCourseSettings] = useState<CourseSettings>(emptyCourseSettings)
+  const [uploadLimits, setUploadLimits] = useState<UploadLimits>(defaultUploadLimits)
   const [finalQuestionForm, setFinalQuestionForm] = useState<FinalTestQuestionForm>(emptyFinalQuestionForm)
   const [finalSubmissions, setFinalSubmissions] = useState<FinalTestSubmission[]>([])
   const [courseReviews, setCourseReviews] = useState<CourseReview[]>([])
@@ -388,6 +401,7 @@ export default function CourseEditorPage() {
   const [savingLesson, setSavingLesson] = useState(false)
   const [savingQuestion, setSavingQuestion] = useState(false)
   const [savingFinalTest, setSavingFinalTest] = useState(false)
+  const [savingCourseSettings, setSavingCourseSettings] = useState(false)
   const [savingFinalQuestion, setSavingFinalQuestion] = useState(false)
   const [savingFinalQuestionEdit, setSavingFinalQuestionEdit] = useState(false)
   const [gradingSubmissionId, setGradingSubmissionId] = useState<number | null>(null)
@@ -402,7 +416,8 @@ export default function CourseEditorPage() {
   const [savingVerification, setSavingVerification] = useState(false)
 
   const currentCourseId = course?.id ?? (Number.isFinite(courseId) ? courseId : null)
-  const initialTab = searchParams.get("tab") === "final-test" ? "final-test" : "info"
+  const requestedTab = searchParams.get("tab")
+  const initialTab = requestedTab === "final-test" || requestedTab === "settings" ? requestedTab : "info"
 
   useEffect(() => {
     const user = getStoredUser()
@@ -422,9 +437,17 @@ export default function CourseEditorPage() {
       try {
         setLoading(true)
         setError(null)
-        const verificationRes = await apiFetch<InstructorVerification | null>("/instructor-verifications/me")
+        const [verificationRes, uploadLimitsRes] = await Promise.allSettled([
+          apiFetch<InstructorVerification | null>("/instructor-verifications/me"),
+          apiFetch<UploadLimits>("/settings/upload-limits"),
+        ])
         if (!alive) return
-        setVerification(verificationRes.data)
+        if (verificationRes.status === "fulfilled") {
+          setVerification(verificationRes.value.data)
+        }
+        if (uploadLimitsRes.status === "fulfilled") {
+          setUploadLimits((prev) => ({ ...prev, ...uploadLimitsRes.value.data }))
+        }
 
         if (isNewCourse) {
           return
@@ -455,10 +478,11 @@ export default function CourseEditorPage() {
 
         if (alive) setQuestionsByLesson(Object.fromEntries(questionEntries))
 
-        const [finalTestRes, submissionsRes, courseReviewsRes] = await Promise.allSettled([
+        const [finalTestRes, submissionsRes, courseReviewsRes, courseSettingsRes] = await Promise.allSettled([
           apiFetch<FinalTest | null>(`/instructor/courses/${courseId}/final-test`),
           apiFetch<FinalTestSubmission[]>(`/instructor/courses/${courseId}/final-test/submissions?status=pending_grading`),
           apiFetch<CourseReview[]>(`/instructor/courses/${courseId}/reviews`),
+          apiFetch<CourseSettings>(`/courses/${courseId}/settings`),
         ])
         if (!alive) return
         if (finalTestRes.status === "fulfilled" && finalTestRes.value.data) {
@@ -480,6 +504,9 @@ export default function CourseEditorPage() {
         }
         if (courseReviewsRes.status === "fulfilled") {
           setCourseReviews(courseReviewsRes.value.data)
+        }
+        if (courseSettingsRes.status === "fulfilled") {
+          setCourseSettings(courseSettingsRes.value.data)
         }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Không tải được khóa học")
@@ -1046,6 +1073,31 @@ export default function CourseEditorPage() {
     }
   }
 
+  async function handleSaveCourseSettings() {
+    if (!currentCourseId) {
+      setError("Vui lòng lưu khóa học trước khi chỉnh cài đặt")
+      return
+    }
+
+    try {
+      setSavingCourseSettings(true)
+      setMessage(null)
+      setError(null)
+      const result = await apiFetch<CourseSettings>(`/courses/${currentCourseId}/settings`, {
+        method: "PATCH",
+        body: JSON.stringify(courseSettings),
+      })
+      setCourseSettings(result.data)
+      setFinalTestForm((prev) => ({ ...prev, passing_score_percent: String(result.data.final_test_pass_score) }))
+      setFinalTest((prev) => (prev ? { ...prev, passing_score_percent: result.data.final_test_pass_score } : prev))
+      setMessage("Đã lưu cài đặt khóa học.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không lưu được cài đặt khóa học")
+    } finally {
+      setSavingCourseSettings(false)
+    }
+  }
+
   async function handleAddFinalQuestion() {
     if (!finalTest) {
       setError("Vui lòng tạo Final Test trước khi thêm câu hỏi")
@@ -1297,10 +1349,11 @@ export default function CourseEditorPage() {
         {error && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
         <Tabs defaultValue={initialTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-3xl grid-cols-5">
+          <TabsList className="grid w-full max-w-4xl grid-cols-6">
             <TabsTrigger value="info">Thông tin</TabsTrigger>
             <TabsTrigger value="lessons" disabled={!currentCourseId}>Bài giảng</TabsTrigger>
             <TabsTrigger value="questions" disabled={!currentCourseId}>Câu hỏi</TabsTrigger>
+            <TabsTrigger value="settings" disabled={!currentCourseId}>Cài đặt</TabsTrigger>
             <TabsTrigger value="final-test" disabled={!currentCourseId}>Final Test</TabsTrigger>
             <TabsTrigger value="reviews" disabled={!currentCourseId}>Đánh giá</TabsTrigger>
           </TabsList>
@@ -1383,11 +1436,10 @@ export default function CourseEditorPage() {
                       <Label>Ảnh đại diện khóa học</Label>
                       <Input
                         type="file"
-                        accept={THUMBNAIL_ACCEPT}
                         onChange={(e) => handleThumbnailFileChange(e.target.files?.[0] ?? null)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        JPG, JPEG, PNG, WEBP; tối đa 5MB. Nếu không upload, hệ thống dùng ảnh mặc định theo lĩnh vực.
+                        {uploadRuleText(uploadLimits, "max_thumbnail_size_mb", "allowed_thumbnail_extensions")} Nếu không upload, hệ thống dùng ảnh mặc định theo lĩnh vực.
                       </p>
                       {courseForm.thumbnail_url && !thumbnailFile && (
                         <p className="text-xs text-muted-foreground">Đang dùng ảnh riêng đã upload.</p>
@@ -1448,19 +1500,17 @@ export default function CourseEditorPage() {
                   <Label>Upload video</Label>
                   <Input
                     type="file"
-                    accept={VIDEO_ACCEPT}
                     onChange={(e) => setLessonVideoFile(e.target.files?.[0] ?? null)}
                   />
-                  <p className="text-xs text-muted-foreground">MP4, WebM, MOV; tối đa 100MB.</p>
+                  <p className="text-xs text-muted-foreground">{uploadRuleText(uploadLimits, "max_video_size_mb", "allowed_video_extensions")}</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Upload tài liệu</Label>
                   <Input
                     type="file"
-                    accept={DOCUMENT_ACCEPT}
                     onChange={(e) => setLessonDocumentFile(e.target.files?.[0] ?? null)}
                   />
-                  <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, PPT, PPTX; tối đa 20MB.</p>
+                  <p className="text-xs text-muted-foreground">{uploadRuleText(uploadLimits, "max_document_size_mb", "allowed_document_extensions")}</p>
                 </div>
                 <div className="lg:col-span-2">
                   <Button onClick={handleAddLesson} disabled={savingLesson || Boolean(uploadingLessonAsset) || !currentCourseId}>
@@ -1528,18 +1578,18 @@ export default function CourseEditorPage() {
                             <Label>Upload video mới</Label>
                             <Input
                               type="file"
-                              accept={VIDEO_ACCEPT}
                               onChange={(e) => setLessonEditVideoFile(e.target.files?.[0] ?? null)}
                             />
+                            <p className="text-xs text-muted-foreground">{uploadRuleText(uploadLimits, "max_video_size_mb", "allowed_video_extensions")}</p>
                             {lesson.video_url && <p className="text-xs text-muted-foreground">Đã có video: {lesson.video_url}</p>}
                           </div>
                           <div className="space-y-2">
                             <Label>Upload tài liệu mới</Label>
                             <Input
                               type="file"
-                              accept={DOCUMENT_ACCEPT}
                               onChange={(e) => setLessonEditDocumentFile(e.target.files?.[0] ?? null)}
                             />
+                            <p className="text-xs text-muted-foreground">{uploadRuleText(uploadLimits, "max_document_size_mb", "allowed_document_extensions")}</p>
                             {lesson.document_url && <p className="text-xs text-muted-foreground">Đã có tài liệu: {lesson.document_name || lesson.document_url}</p>}
                           </div>
                           <div className="flex flex-wrap gap-2 lg:col-span-2">
@@ -1787,6 +1837,110 @@ export default function CourseEditorPage() {
                     </div>
                   ))
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cài đặt khóa học</CardTitle>
+                <CardDescription>Thiết lập điều kiện hoàn thành bài học, quiz và Final Test cho khóa học này.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>% xem video để hoàn thành bài học</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={courseSettings.lesson_completion_percent}
+                      onChange={(e) => setCourseSettings((prev) => ({ ...prev, lesson_completion_percent: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Điểm pass quiz mặc định (%)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={courseSettings.default_quiz_pass_score}
+                      onChange={(e) => setCourseSettings((prev) => ({ ...prev, default_quiz_pass_score: Number(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Điểm pass Final Test (%)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={courseSettings.final_test_pass_score}
+                      onChange={(e) => setCourseSettings((prev) => ({ ...prev, final_test_pass_score: Number(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-lg border border-border p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-foreground">Cho phép làm lại quiz</p>
+                        <p className="text-sm text-muted-foreground">Tắt tùy chọn này để học viên chỉ làm quiz một lần.</p>
+                      </div>
+                      <Switch
+                        checked={courseSettings.allow_quiz_retake}
+                        onCheckedChange={(checked) => setCourseSettings((prev) => ({ ...prev, allow_quiz_retake: checked }))}
+                      />
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      <Label>Số lần làm quiz tối đa</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={courseSettings.max_quiz_attempts}
+                        onChange={(e) => setCourseSettings((prev) => ({ ...prev, max_quiz_attempts: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-foreground">Bắt buộc Final Test</p>
+                        <p className="text-sm text-muted-foreground">Final Test là điều kiện hoàn thành khóa học khi được bật.</p>
+                      </div>
+                      <Switch
+                        checked={courseSettings.require_final_test}
+                        onCheckedChange={(checked) => setCourseSettings((prev) => ({ ...prev, require_final_test: checked }))}
+                      />
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-foreground">Cho phép làm lại Final Test</p>
+                        <p className="text-sm text-muted-foreground">Tắt tùy chọn này để học viên chỉ nộp một lần.</p>
+                      </div>
+                      <Switch
+                        checked={courseSettings.allow_final_test_retake}
+                        onCheckedChange={(checked) => setCourseSettings((prev) => ({ ...prev, allow_final_test_retake: checked }))}
+                      />
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      <Label>Số lần làm Final Test tối đa</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={courseSettings.max_final_test_attempts}
+                        onChange={(e) => setCourseSettings((prev) => ({ ...prev, max_final_test_attempts: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Button onClick={handleSaveCourseSettings} disabled={savingCourseSettings || !currentCourseId}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {savingCourseSettings ? "Đang lưu..." : "Lưu cài đặt khóa học"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

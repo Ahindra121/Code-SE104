@@ -43,6 +43,13 @@ type Submission = {
   graded_at?: string | null
 }
 
+type CourseSettings = {
+  final_test_pass_score: number
+  allow_final_test_retake: boolean
+  max_final_test_attempts: number
+  require_final_test: boolean
+}
+
 function statusLabel(status: SubmissionStatus) {
   if (status === "pending_grading") return "Chờ chấm"
   if (status === "passed") return "Đạt"
@@ -58,6 +65,7 @@ export default function FinalTestPage() {
 
   const [test, setTest] = useState<FinalTest | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [courseSettings, setCourseSettings] = useState<CourseSettings | null>(null)
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -80,13 +88,15 @@ export default function FinalTestPage() {
       try {
         setLoading(true)
         setError(null)
-        const [testRes, submissionsRes] = await Promise.all([
+        const [testRes, submissionsRes, settingsRes] = await Promise.all([
           apiFetch<FinalTest>(`/courses/${courseId}/final-test`),
           apiFetch<Submission[]>(`/courses/${courseId}/final-test/submissions/me`),
+          apiFetch<CourseSettings>(`/courses/${courseId}/settings`),
         ])
         if (!alive) return
         setTest(testRes.data)
         setSubmissions(submissionsRes.data)
+        setCourseSettings(settingsRes.data)
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Không tải được Final Test")
       } finally {
@@ -106,6 +116,10 @@ export default function FinalTestPage() {
   }, [answers, test])
   const allAnswered = Boolean(test?.questions.length && answeredCount === test.questions.length)
   const hasPassed = submissions.some((submission) => submission.status === "passed")
+  const attemptLimit = courseSettings ? (courseSettings.allow_final_test_retake ? courseSettings.max_final_test_attempts : 1) : null
+  const attemptsUsed = submissions.length
+  const attemptsRemaining = attemptLimit == null ? null : Math.max(0, attemptLimit - attemptsUsed)
+  const passScore = courseSettings?.final_test_pass_score ?? test?.passing_score_percent ?? 0
 
   async function handleSubmit() {
     if (!test || !allAnswered) return
@@ -170,7 +184,7 @@ export default function FinalTestPage() {
             </Link>
           </Button>
           <Badge variant={hasPassed ? "default" : "secondary"} className={hasPassed ? "bg-green-600" : ""}>
-            {hasPassed ? "Khóa học đã hoàn thành" : `Cần đạt ${test.passing_score_percent}%`}
+            {hasPassed ? "Khóa học đã hoàn thành" : `Cần đạt ${passScore}%`}
           </Badge>
         </div>
       </header>
@@ -187,6 +201,12 @@ export default function FinalTestPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
+                <div className="mb-4 rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  <p>Điểm đạt Final Test: {passScore}%.</p>
+                  {attemptLimit != null && (
+                    <p className="mt-1">Số lượt làm: {attemptsUsed}/{attemptLimit}. Còn lại: {attemptsRemaining}.</p>
+                  )}
+                </div>
                 <div className="mb-2 flex justify-between text-sm">
                   <span className="text-muted-foreground">Đã trả lời</span>
                   <span className="font-medium">
@@ -236,7 +256,7 @@ export default function FinalTestPage() {
               {message && <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{message}</p>}
               {error && <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
 
-              <Button className="w-full" size="lg" onClick={handleSubmit} disabled={!allAnswered || submitting}>
+              <Button className="w-full" size="lg" onClick={handleSubmit} disabled={!allAnswered || submitting || attemptsRemaining === 0}>
                 {submitting ? "Đang nộp..." : "Nộp Final Test"}
               </Button>
             </CardContent>

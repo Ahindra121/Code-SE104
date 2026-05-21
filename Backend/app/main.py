@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.routers import auth, certificates, courses, enrollments, final_tests, instructor_verifications, lessons, progress, questions, quizzes, reports, reviews, users
+from app.routers import auth, certificates, courses, enrollments, final_tests, instructor_verifications, lessons, progress, questions, quizzes, reports, reviews, settings as settings_router, users
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"
@@ -43,6 +43,9 @@ for router in [
     users.router,
     courses.router,
     courses.admin_router,
+    settings_router.router,
+    settings_router.admin_router,
+    settings_router.course_router,
     instructor_verifications.router,
     instructor_verifications.admin_router,
     lessons.router,

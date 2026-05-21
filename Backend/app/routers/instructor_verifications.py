@@ -20,13 +20,12 @@ from app.models.entities import (
 )
 from app.schemas.common import ok
 from app.schemas.instructor_verification import InstructorVerificationOut, InstructorVerificationReject
+from app.services.settings_service import get_extensions_setting, get_int_setting
 
 router = APIRouter(prefix="/instructor-verifications", tags=["Instructor Verifications"])
 
 UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
 VERIFICATION_UPLOAD_ROOT = UPLOAD_ROOT / "verifications"
-ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
-MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _now() -> datetime:
@@ -39,10 +38,13 @@ def _safe_filename(filename: str) -> str:
     return "".join(char for char in ascii_name if char.isalnum() or char in "._-") or "upload"
 
 
-async def _save_verification_file(file: UploadFile, destination_dir: Path) -> str:
+async def _save_verification_file(db: Session, file: UploadFile, destination_dir: Path) -> str:
     extension = Path(file.filename or "").suffix.lower()
-    if extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File xac minh chi ho tro PDF, JPG, JPEG hoac PNG")
+    allowed_extensions = get_extensions_setting(db, "allowed_verification_extensions")
+    if extension not in allowed_extensions:
+        allowed = ", ".join(sorted(item.lstrip(".") for item in allowed_extensions))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Dinh dang file xac minh khong duoc ho tro. Dinh dang cho phep: {allowed}")
+    max_size_mb = get_int_setting(db, "max_verification_file_size_mb")
 
     destination_dir.mkdir(parents=True, exist_ok=True)
     destination = destination_dir / f"{uuid4().hex}_{_safe_filename(file.filename or f'upload{extension}')}"
@@ -51,10 +53,10 @@ async def _save_verification_file(file: UploadFile, destination_dir: Path) -> st
         with destination.open("wb") as output:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
-                if size > MAX_FILE_SIZE:
+                if size > max_size_mb * 1024 * 1024:
                     output.close()
                     destination.unlink(missing_ok=True)
-                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Moi file xac minh toi da 10MB")
+                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"Moi file xac minh vuot qua dung luong toi da {max_size_mb}MB")
                 output.write(chunk)
     except HTTPException:
         raise
@@ -118,9 +120,9 @@ async def submit_verification(
         if not all([(major or "").strip(), (university_name or "").strip(), graduation_year]):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui long nhap day du thong tin bang cap")
 
-        cccd_front_url = await _save_verification_file(cccd_front_file, upload_dir)
-        cccd_back_url = await _save_verification_file(cccd_back_file, upload_dir)
-        degree_url = await _save_verification_file(degree_file, upload_dir)
+        cccd_front_url = await _save_verification_file(db, cccd_front_file, upload_dir)
+        cccd_back_url = await _save_verification_file(db, cccd_back_file, upload_dir)
+        degree_url = await _save_verification_file(db, degree_file, upload_dir)
 
         verification = InstructorVerification(
             user_id=current_user.id,
@@ -156,8 +158,8 @@ async def submit_verification(
     if not all([full_name.strip(), cccd_number.strip()]):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui long nhap day du thong tin xac minh")
 
-    cccd_front_url = await _save_verification_file(cccd_front_file, upload_dir) if cccd_front_file else None
-    cccd_back_url = await _save_verification_file(cccd_back_file, upload_dir) if cccd_back_file else None
+    cccd_front_url = await _save_verification_file(db, cccd_front_file, upload_dir) if cccd_front_file else None
+    cccd_back_url = await _save_verification_file(db, cccd_back_file, upload_dir) if cccd_back_file else None
 
     if is_existing_approved:
         new_full_name = full_name.strip()
@@ -181,7 +183,7 @@ async def submit_verification(
     if degree_file:
         if not all([(major or "").strip(), (university_name or "").strip(), graduation_year]):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vui long nhap day du thong tin bang cap")
-        degree_url = await _save_verification_file(degree_file, upload_dir)
+        degree_url = await _save_verification_file(db, degree_file, upload_dir)
         qualification_status = (
             InstructorQualificationStatus.pending if is_existing_approved else InstructorQualificationStatus.pending
         )

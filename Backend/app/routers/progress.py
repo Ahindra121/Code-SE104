@@ -18,7 +18,7 @@ def require_enrollment(db: Session, student_id: int, course_id: int) -> Enrollme
         select(Enrollment).where(
             Enrollment.student_id == student_id,
             Enrollment.course_id == course_id,
-            Enrollment.status == EnrollmentStatus.active,
+            Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
         )
     )
     if not enrollment:
@@ -70,7 +70,6 @@ def _has_passing_quiz(db: Session, student_id: int, lesson_id: int) -> bool:
                 QuizAttempt.student_id == student_id,
                 QuizAttempt.lesson_id == lesson_id,
                 QuizAttempt.passed.is_(True),
-                QuizAttempt.score >= 8,
             )
         )
     )
@@ -80,7 +79,7 @@ def sync_lesson_completion(db: Session, progress: LearningProgress, lesson: Less
     if progress.is_completed:
         return
     if lesson.video_url:
-        content_completed = (progress.progress_percent or 0) >= 90
+        content_completed = (progress.progress_percent or 0) >= lesson.course.lesson_completion_percent
     else:
         content_completed = True
 

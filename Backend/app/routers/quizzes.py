@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,7 +21,7 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
             Enrollment.course_id == lesson.course_id,
-            Enrollment.status == EnrollmentStatus.active,
+            Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
         )
     )
     if not enrolled:
@@ -29,6 +29,15 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
     questions = db.scalars(select(Question).where(Question.lesson_id == lesson.id, Question.is_active.is_(True))).all()
     if not questions:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active questions for this lesson")
+    attempts_count = db.scalar(
+        select(func.count(QuizAttempt.id)).where(
+            QuizAttempt.student_id == current_user.id,
+            QuizAttempt.lesson_id == lesson.id,
+        )
+    ) or 0
+    max_attempts = 1 if not lesson.course.allow_quiz_retake else lesson.course.max_quiz_attempts
+    if attempts_count >= max_attempts:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Ban da het so lan lam quiz toi da ({max_attempts})")
 
     selected_by_question = {answer.question_id: answer.selected_option for answer in payload.answers}
     correct_count = sum(1 for question in questions if selected_by_question.get(question.id) == question.correct_option)
@@ -40,7 +49,7 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
         score=score,
         total_questions=len(questions),
         correct_count=correct_count,
-        passed=score >= 8,
+        passed=(score * 10) >= lesson.course.default_quiz_pass_score,
     )
     db.add(attempt)
     db.flush()

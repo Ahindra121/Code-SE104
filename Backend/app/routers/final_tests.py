@@ -100,6 +100,10 @@ def _active_final_test(db: Session, course_id: int) -> FinalTest:
     return final_test
 
 
+def _final_test_pass_score(final_test: FinalTest) -> float:
+    return float(final_test.course.final_test_pass_score)
+
+
 def _answer_value(answer: Any) -> str:
     return str(answer).strip()
 
@@ -147,6 +151,9 @@ def check_final_test_eligibility(
     current_user: User = Depends(require_roles(UserRole.student)),
 ):
     _require_enrolled(db, current_user.id, course_id)
+    course = db.get(Course, course_id)
+    if course and not course.require_final_test:
+        return ok(FinalTestEligibilityOut(eligible=False, reason="Final test is not required for this course"))
     final_test = db.scalar(select(FinalTest.id).where(FinalTest.course_id == course_id, FinalTest.is_active.is_(True)))
     if not final_test:
         return ok(FinalTestEligibilityOut(eligible=False, reason="Final test is not available"))
@@ -181,6 +188,15 @@ def submit_final_test(
 ):
     _assert_eligible(db, current_user.id, course_id)
     final_test = _active_final_test(db, course_id)
+    attempts_count = db.scalar(
+        select(func.count(FinalTestSubmission.id)).where(
+            FinalTestSubmission.final_test_id == final_test.id,
+            FinalTestSubmission.student_id == current_user.id,
+        )
+    ) or 0
+    max_attempts = 1 if not final_test.course.allow_final_test_retake else final_test.course.max_final_test_attempts
+    if attempts_count >= max_attempts:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Ban da het so lan lam Final Test toi da ({max_attempts})")
     questions = list(final_test.questions)
     if not questions:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Final test has no questions")
@@ -238,7 +254,7 @@ def submit_final_test(
         submission.score_percent = 0 if max_score <= 0 else round((submission.total_score / max_score) * 100, 2)
         submission.status = (
             FinalTestSubmissionStatus.passed
-            if submission.score_percent >= final_test.passing_score_percent
+            if submission.score_percent >= _final_test_pass_score(final_test)
             else FinalTestSubmissionStatus.failed
         )
     db.add(submission)
@@ -279,6 +295,7 @@ def create_final_test(
     if payload.is_active:
         db.query(FinalTest).filter(FinalTest.course_id == course_id).update({FinalTest.is_active: False})
     final_test = FinalTest(course_id=course_id, **payload.model_dump())
+    final_test.passing_score_percent = course.final_test_pass_score
     db.add(final_test)
     db.commit()
     db.refresh(final_test)
@@ -439,7 +456,7 @@ def grade_final_test_submission(
     submission.score_percent = 0 if submission.max_score <= 0 else round((submission.total_score / submission.max_score) * 100, 2)
     submission.status = (
         FinalTestSubmissionStatus.passed
-        if submission.score_percent >= submission.final_test.passing_score_percent
+        if submission.score_percent >= _final_test_pass_score(submission.final_test)
         else FinalTestSubmissionStatus.failed
     )
     submission.instructor_feedback = payload.instructor_feedback

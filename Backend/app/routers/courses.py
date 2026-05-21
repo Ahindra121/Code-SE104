@@ -34,13 +34,13 @@ from app.schemas.course import (
     CourseUpdate,
 )
 from app.services.course_service import assert_course_owner, course_to_out
+from app.services.settings_service import get_extensions_setting, get_int_setting
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 CONTENT_RESTORE_DAYS = 30
 REVIEW_STATUSES = [CourseStatus.pending, CourseStatus.pending_review]
 UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
 THUMBNAIL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024
 
 
 def _now() -> datetime:
@@ -80,10 +80,13 @@ def _delete_upload(url: str | None) -> None:
         path.unlink(missing_ok=True)
 
 
-async def _save_thumbnail(file: UploadFile, course_id: int) -> str:
+async def _save_thumbnail(db: Session, file: UploadFile, course_id: int) -> str:
     extension = Path(file.filename or "").suffix.lower()
-    if extension not in THUMBNAIL_EXTENSIONS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Anh dai dien khoa hoc chi ho tro JPG, JPEG, PNG hoac WEBP")
+    allowed_extensions = get_extensions_setting(db, "allowed_thumbnail_extensions")
+    if extension not in allowed_extensions:
+        allowed = ", ".join(sorted(item.lstrip(".") for item in allowed_extensions))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Dinh dang anh khoa hoc khong duoc ho tro. Dinh dang cho phep: {allowed}")
+    max_size_mb = get_int_setting(db, "max_thumbnail_size_mb")
 
     upload_dir = UPLOAD_ROOT / "courses" / f"course_{course_id}" / "thumbnail"
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -94,10 +97,10 @@ async def _save_thumbnail(file: UploadFile, course_id: int) -> str:
         with destination.open("wb") as output:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
-                if size > MAX_THUMBNAIL_SIZE:
+                if size > max_size_mb * 1024 * 1024:
                     output.close()
                     destination.unlink(missing_ok=True)
-                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Anh dai dien khoa hoc toi da 5MB")
+                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"Anh dai dien khoa hoc vuot qua dung luong toi da {max_size_mb}MB")
                 output.write(chunk)
     except HTTPException:
         raise
@@ -259,7 +262,7 @@ async def upload_course_thumbnail(
         assert_course_owner(course, current_user)
 
     old_url = course.thumbnail_url
-    course.thumbnail_url = await _save_thumbnail(file, course.id)
+    course.thumbnail_url = await _save_thumbnail(db, file, course.id)
     _delete_upload(old_url)
     db.commit()
     db.refresh(course)

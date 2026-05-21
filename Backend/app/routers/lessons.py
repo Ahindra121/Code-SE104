@@ -16,14 +16,11 @@ from app.schemas.lesson import LessonCreate, LessonOut, LessonReorder, LessonUpd
 from app.schemas.progress import LessonProgressUpdate, ProgressOut
 from app.routers.progress import apply_progress_update, require_enrollment, sync_lesson_completion
 from app.services.course_service import assert_course_owner
+from app.services.settings_service import get_extensions_setting, get_int_setting
 
 router = APIRouter(prefix="/lessons", tags=["Lessons"])
 CONTENT_RESTORE_DAYS = 30
 UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
-VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov"}
-DOCUMENT_EXTENSIONS = {".pdf", ".doc", ".docx", ".ppt", ".pptx"}
-MAX_VIDEO_SIZE = 100 * 1024 * 1024
-MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
 
 
 def _now() -> datetime:
@@ -48,7 +45,7 @@ def can_access_lesson(db: Session, user: User, lesson: Lesson) -> bool:
             select(Enrollment).where(
                 Enrollment.student_id == user.id,
                 Enrollment.course_id == lesson.course_id,
-                Enrollment.status == EnrollmentStatus.active,
+                Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
             )
         )
     )
@@ -92,7 +89,8 @@ async def _save_upload(
 ) -> tuple[str, str, str]:
     extension = Path(file.filename or "").suffix.lower()
     if extension not in allowed_extensions:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=invalid_message)
+        allowed = ", ".join(sorted(item.lstrip(".") for item in allowed_extensions))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{invalid_message}. Dinh dang cho phep: {allowed}")
 
     destination_dir.mkdir(parents=True, exist_ok=True)
     safe_name = _safe_filename(file.filename or f"upload{extension}")
@@ -189,7 +187,7 @@ def list_lessons(
             select(Enrollment).where(
                 Enrollment.student_id == current_user.id,
                 Enrollment.course_id == course_id,
-                Enrollment.status == EnrollmentStatus.active,
+                Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
             )
         )
         if not enrolled and course.status != CourseStatus.approved:
@@ -287,7 +285,15 @@ async def upload_lesson_video(
     assert_course_owner(lesson.course, current_user)
 
     upload_dir = UPLOAD_ROOT / "courses" / f"course_{lesson.course_id}" / "lessons" / f"lesson_{lesson.id}" / "videos"
-    new_url, _, _ = await _save_upload(file, upload_dir, VIDEO_EXTENSIONS, MAX_VIDEO_SIZE, "Sai định dạng video", "Video vượt quá 100MB")
+    max_size_mb = get_int_setting(db, "max_video_size_mb")
+    new_url, _, _ = await _save_upload(
+        file,
+        upload_dir,
+        get_extensions_setting(db, "allowed_video_extensions"),
+        max_size_mb * 1024 * 1024,
+        "Sai dinh dang video",
+        f"Video vuot qua dung luong toi da {max_size_mb}MB",
+    )
     _delete_upload(lesson.video_url)
     lesson.video_url = new_url
     db.commit()
@@ -308,13 +314,14 @@ async def upload_lesson_document(
     assert_course_owner(lesson.course, current_user)
 
     upload_dir = UPLOAD_ROOT / "courses" / f"course_{lesson.course_id}" / "lessons" / f"lesson_{lesson.id}" / "documents"
+    max_size_mb = get_int_setting(db, "max_document_size_mb")
     new_url, document_name, document_type = await _save_upload(
         file,
         upload_dir,
-        DOCUMENT_EXTENSIONS,
-        MAX_DOCUMENT_SIZE,
-        "Sai định dạng tài liệu",
-        "Tài liệu vượt quá 20MB",
+        get_extensions_setting(db, "allowed_document_extensions"),
+        max_size_mb * 1024 * 1024,
+        "Sai dinh dang tai lieu",
+        f"Tai lieu vuot qua dung luong toi da {max_size_mb}MB",
     )
     _delete_upload(lesson.document_url)
     lesson.document_url = new_url
@@ -389,7 +396,7 @@ def complete_lesson(
 ):
     lesson = _get_lesson_for_student_progress(db, lesson_id, current_user)
     if lesson.video_url:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Video lessons must be completed by watching at least 90% and passing quiz if available")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Video lessons must be completed by watching at least {lesson.course.lesson_completion_percent}% and passing quiz if available")
     progress = _get_or_create_progress(db, lesson, current_user)
     progress.watched_seconds = lesson.duration_seconds or progress.watched_seconds or 0
     progress.max_watched_seconds = max(progress.max_watched_seconds or 0, lesson.duration_seconds or 0)

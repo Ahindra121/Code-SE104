@@ -11,6 +11,7 @@ from app.models.entities import (
     QuizAnswer,
     QuizAttempt,
     Review,
+    SystemSetting,
     User,
 )
 
@@ -27,5 +28,6 @@ __all__ = [
     "QuizAnswer",
     "QuizAttempt",
     "Review",
+    "SystemSetting",
     "User",
 ]

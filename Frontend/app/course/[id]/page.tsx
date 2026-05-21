@@ -85,6 +85,17 @@ type FinalTestSubmission = {
   instructor_feedback?: string | null
 }
 
+type CourseSettings = {
+  lesson_completion_percent: number
+  default_quiz_pass_score: number
+  final_test_pass_score: number
+  allow_quiz_retake: boolean
+  max_quiz_attempts: number
+  allow_final_test_retake: boolean
+  max_final_test_attempts: number
+  require_final_test: boolean
+}
+
 type Review = {
   id: number
   student_id: number
@@ -181,6 +192,7 @@ export default function CourseDetailPage() {
   const [progress, setProgress] = useState<CourseProgress | null>(null)
   const [finalTestEligibility, setFinalTestEligibility] = useState<FinalTestEligibility | null>(null)
   const [finalTestSubmissions, setFinalTestSubmissions] = useState<FinalTestSubmission[]>([])
+  const [courseSettings, setCourseSettings] = useState<CourseSettings | null>(null)
   const [viewer, setViewer] = useState<LearnHubUser | null>(null)
   const [isEnrolled, setIsEnrolled] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -243,23 +255,25 @@ export default function CourseDetailPage() {
         if (!alive) return
 
         const enrolled = enrollmentsRes.data.some(
-          (item) => item.course_id === courseId && item.status === "active"
+          (item) => item.course_id === courseId && (item.status === "active" || item.status === "completed")
         )
         setIsEnrolled(enrolled)
 
         if (enrolled) {
-          const [lessonsRes, progressRes, eligibilityRes, submissionsRes, reviewEligibilityRes] = await Promise.all([
+          const [lessonsRes, progressRes, eligibilityRes, submissionsRes, reviewEligibilityRes, settingsRes] = await Promise.all([
             apiFetch<Lesson[]>(`/lessons/course/${courseId}`),
             apiFetch<CourseProgress>(`/progress/course/${courseId}`),
             apiFetch<FinalTestEligibility>(`/courses/${courseId}/final-test/eligibility`),
             apiFetch<FinalTestSubmission[]>(`/courses/${courseId}/final-test/submissions/me`),
             apiFetch<ReviewEligibility>(`/courses/${courseId}/reviews/eligibility`),
+            apiFetch<CourseSettings>(`/courses/${courseId}/settings`),
           ])
           if (!alive) return
           setLessons(lessonsRes.data)
           setProgress(progressRes.data)
           setFinalTestEligibility(eligibilityRes.data)
           setFinalTestSubmissions(submissionsRes.data)
+          setCourseSettings(settingsRes.data)
           setReviewEligibility(reviewEligibilityRes.data)
           if (reviewEligibilityRes.data.already_reviewed) {
             const myReviewRes = await apiFetch<Review>(`/courses/${courseId}/reviews/me`)
@@ -324,13 +338,15 @@ export default function CourseDetailPage() {
         body: JSON.stringify({ course_id: courseId }),
       })
 
-      const [lessonsRes, progressRes] = await Promise.all([
+      const [lessonsRes, progressRes, settingsRes] = await Promise.all([
         apiFetch<Lesson[]>(`/lessons/course/${courseId}`),
         apiFetch<CourseProgress>(`/progress/course/${courseId}`),
+        apiFetch<CourseSettings>(`/courses/${courseId}/settings`),
       ])
 
       setLessons(lessonsRes.data)
       setProgress(progressRes.data)
+      setCourseSettings(settingsRes.data)
       const eligibilityRes = await apiFetch<FinalTestEligibility>(`/courses/${courseId}/final-test/eligibility`)
       setFinalTestEligibility(eligibilityRes.data)
       const reviewEligibilityRes = await apiFetch<ReviewEligibility>(`/courses/${courseId}/reviews/eligibility`)
@@ -450,6 +466,8 @@ export default function CourseDetailPage() {
   const homeHref = viewer ? redirectPathForRole(viewer.role) : "/"
   const finalTestOpen = Boolean(finalTestEligibility?.eligible)
   const finalTestPassed = finalTestSubmissions.some((submission) => submission.status === "passed")
+  const finalTestRequired = courseSettings?.require_final_test !== false
+  const canRequestCertificate = percent >= 100 && (!finalTestRequired || finalTestPassed)
 
   return (
     <div className="min-h-screen bg-background">
@@ -557,7 +575,7 @@ export default function CourseDetailPage() {
                       <Play className="mr-2 h-4 w-4" /> Vào học
                     </Link>
                   </Button>
-                  {isEnrolled && percent >= 100 && (
+                  {isEnrolled && percent >= 100 && finalTestRequired && (
                     <>
                       <Button className="mt-3 w-full" variant="outline" asChild={finalTestOpen} disabled={!finalTestOpen}>
                         {finalTestOpen ? (
@@ -584,7 +602,7 @@ export default function CourseDetailPage() {
                       className="mt-3 w-full"
                       variant="outline"
                       onClick={handleIssueCertificate}
-                      disabled={certificateLoading || !finalTestPassed}
+                      disabled={certificateLoading || !canRequestCertificate}
                     >
                       {certificateLoading ? "Đang cấp chứng chỉ..." : "Nhận chứng chỉ"}
                     </Button>
@@ -603,6 +621,17 @@ export default function CourseDetailPage() {
               {successMessage && <p className="mt-4 text-sm text-green-600">{successMessage}</p>}
 
               <div className="mt-6 space-y-3 text-sm">
+                {isEnrolled && courseSettings && (
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <p className="font-medium text-foreground">Điều kiện hoàn thành</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Xem ít nhất {courseSettings.lesson_completion_percent}% video, quiz đạt {courseSettings.default_quiz_pass_score}%.
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      Quiz: tối đa {courseSettings.allow_quiz_retake ? courseSettings.max_quiz_attempts : 1} lần. Final Test: {courseSettings.require_final_test ? `bắt buộc, đạt ${courseSettings.final_test_pass_score}%, tối đa ${courseSettings.allow_final_test_retake ? courseSettings.max_final_test_attempts : 1} lần` : "không bắt buộc"}.
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center gap-3">
                   <Clock className="h-5 w-5 text-muted-foreground" />
                   <span>Học theo tiến độ cá nhân</span>
@@ -676,7 +705,11 @@ export default function CourseDetailPage() {
                           <div>
                             <p className="font-medium text-foreground">Final Test cuối khóa</p>
                             <p className="text-sm text-muted-foreground">
-                              {finalTestOpen ? "Bạn đã đủ điều kiện làm bài." : "Hoàn thành tất cả bài học để mở Final Test."}
+                              {finalTestOpen
+                                ? `Bạn đã đủ điều kiện làm bài. Cần đạt ${courseSettings?.final_test_pass_score ?? "theo cấu hình"}%.`
+                                : courseSettings?.require_final_test === false
+                                  ? "Final Test không bắt buộc cho khóa học này."
+                                  : "Hoàn thành tất cả bài học để mở Final Test."}
                             </p>
                           </div>
                         </div>

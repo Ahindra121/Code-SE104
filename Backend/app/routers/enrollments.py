@@ -38,7 +38,7 @@ def enroll(payload: EnrollmentCreate, db: Session = Depends(get_db), current_use
     if not course or course.is_deleted or course.status != CourseStatus.approved:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Course is not available for enrollment")
     existing = db.scalar(select(Enrollment).where(Enrollment.student_id == current_user.id, Enrollment.course_id == payload.course_id))
-    if existing and existing.status == EnrollmentStatus.active:
+    if existing and existing.status in [EnrollmentStatus.active, EnrollmentStatus.completed]:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already enrolled")
     if existing:
         existing.status = EnrollmentStatus.active

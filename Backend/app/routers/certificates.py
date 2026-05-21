@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
-from app.models.entities import Certificate, CourseProgress, Enrollment, EnrollmentStatus, FinalTest, LearningProgress, Lesson, QuizAttempt, Question, User, UserRole
+from app.models.entities import Certificate, Course, CourseProgress, Enrollment, EnrollmentStatus, FinalTest, LearningProgress, Lesson, QuizAttempt, Question, User, UserRole
 from app.schemas.certificate import CertificateOut
 from app.schemas.common import ok
 
@@ -23,8 +23,9 @@ def eligibility(db: Session, student_id: int, course_id: int) -> None:
     )
     if not enrolled:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Enrollment required")
+    course = db.get(Course, course_id)
     final_test = db.scalar(select(FinalTest).where(FinalTest.course_id == course_id, FinalTest.is_active.is_(True)))
-    if final_test:
+    if final_test and (not course or course.require_final_test):
         course_progress = db.scalar(
             select(CourseProgress).where(
                 CourseProgress.student_id == student_id,
@@ -59,7 +60,6 @@ def eligibility(db: Session, student_id: int, course_id: int) -> None:
                 QuizAttempt.course_id == course_id,
                 QuizAttempt.lesson_id == lesson_id,
                 QuizAttempt.passed.is_(True),
-                QuizAttempt.score >= 8,
             )
         )
         if not passed:

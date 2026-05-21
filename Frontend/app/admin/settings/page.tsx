@@ -2,129 +2,143 @@
 
 import { useEffect, useState } from "react"
 import { AdminShell } from "../_components/admin-shell"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { apiFetch } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Button } from "@/components/ui/button"
+
+type SystemSetting = {
+  key: string
+  value: string
+  value_type: string
+  description?: string | null
+}
+
+type SettingsForm = Record<string, string>
+
+const uploadFields = [
+  ["max_video_size_mb", "Dung lượng video tối đa (MB)"],
+  ["max_document_size_mb", "Dung lượng tài liệu tối đa (MB)"],
+  ["max_thumbnail_size_mb", "Dung lượng ảnh khóa học tối đa (MB)"],
+  ["max_verification_file_size_mb", "Dung lượng file xác minh tối đa (MB)"],
+] as const
+
+const extensionFields = [
+  ["allowed_video_extensions", "Định dạng video cho phép"],
+  ["allowed_document_extensions", "Định dạng tài liệu cho phép"],
+  ["allowed_thumbnail_extensions", "Định dạng ảnh cho phép"],
+  ["allowed_verification_extensions", "Định dạng file xác minh cho phép"],
+] as const
 
 export default function AdminSettingsPage() {
-  const [settings, setSettings] = useState({
-    platformName: "LearnHub",
-    supportEmail: "support@learnhub.vn",
-    maxUpload: "500MB",
-    maintenanceMode: false,
-    autoApproveInstructors: false,
-    emailNotifications: true,
-    weeklyReports: true,
-  })
-  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const [settings, setSettings] = useState<SettingsForm>({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem("learnhub-admin-settings")
-    if (stored) {
-      setSettings((prev) => ({ ...prev, ...JSON.parse(stored) }))
+    let alive = true
+    async function loadSettings() {
+      try {
+        setLoading(true)
+        setError(null)
+        const result = await apiFetch<SystemSetting[]>("/admin/settings")
+        if (!alive) return
+        setSettings(Object.fromEntries(result.data.map((item) => [item.key, item.value])))
+      } catch (err) {
+        if (alive) setError(err instanceof Error ? err.message : "Không tải được cài đặt hệ thống")
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    loadSettings()
+    return () => {
+      alive = false
     }
   }, [])
 
-  function handleSaveSettings() {
-    localStorage.setItem("learnhub-admin-settings", JSON.stringify(settings))
-    setSavedMessage("Đã lưu thay đổi cài đặt quản trị.")
+  async function handleSaveSettings() {
+    try {
+      setSaving(true)
+      setMessage(null)
+      setError(null)
+      const result = await apiFetch<SystemSetting[]>("/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify(settings),
+      })
+      setSettings(Object.fromEntries(result.data.map((item) => [item.key, item.value])))
+      setMessage("Đã lưu thay đổi cài đặt hệ thống.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không lưu được cài đặt hệ thống")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function updateField(key: string, value: string) {
+    setSettings((prev) => ({ ...prev, [key]: value }))
   }
 
   return (
-    <AdminShell title="Cài đặt quản trị" activeKey="settings">
+    <AdminShell title="Cài đặt hệ thống" activeKey="settings">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Điều chỉnh cấu hình vận hành</h2>
-        <p className="mt-1 text-muted-foreground">Quản lý thông tin nền tảng và các tùy chọn thông báo dành cho quản trị viên.</p>
+        <h2 className="text-2xl font-bold text-foreground">Cấu hình hệ thống</h2>
+        <p className="mt-1 text-muted-foreground">Quản lý giới hạn upload và định dạng file được phép.</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin nền tảng</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="platformName">Tên nền tảng</Label>
-              <Input
-                id="platformName"
-                value={settings.platformName}
-                onChange={(event) => setSettings((prev) => ({ ...prev, platformName: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="supportEmail">Email hỗ trợ</Label>
-              <Input
-                id="supportEmail"
-                type="email"
-                value={settings.supportEmail}
-                onChange={(event) => setSettings((prev) => ({ ...prev, supportEmail: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxUpload">Dung lượng tải lên tối đa</Label>
-              <Input
-                id="maxUpload"
-                value={settings.maxUpload}
-                onChange={(event) => setSettings((prev) => ({ ...prev, maxUpload: event.target.value }))}
-              />
-            </div>
-          </CardContent>
-        </Card>
+      {loading ? (
+        <p className="text-muted-foreground">Đang tải cài đặt...</p>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Upload</CardTitle>
+              <CardDescription>Các giới hạn dung lượng được backend kiểm tra khi người dùng tải file lên.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {uploadFields.map(([key, label]) => (
+                <div key={key} className="space-y-2">
+                  <Label htmlFor={key}>{label}</Label>
+                  <Input
+                    id={key}
+                    type="number"
+                    min="1"
+                    value={settings[key] ?? ""}
+                    onChange={(event) => updateField(key, event.target.value)}
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tùy chọn hệ thống</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Chế độ bảo trì</p>
-                <p className="text-sm text-muted-foreground">Tạm khóa truy cập công khai để bảo trì hệ thống</p>
-              </div>
-              <Switch
-                checked={settings.maintenanceMode}
-                onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, maintenanceMode: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Tự động duyệt giảng viên</p>
-                <p className="text-sm text-muted-foreground">Bỏ qua bước duyệt thủ công khi giảng viên đăng ký</p>
-              </div>
-              <Switch
-                checked={settings.autoApproveInstructors}
-                onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, autoApproveInstructors: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Thông báo email</p>
-                <p className="text-sm text-muted-foreground">Nhận email khi có khóa học hoặc báo cáo cần xử lý</p>
-              </div>
-              <Switch
-                checked={settings.emailNotifications}
-                onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, emailNotifications: checked }))}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-foreground">Báo cáo hàng tuần</p>
-                <p className="text-sm text-muted-foreground">Gửi tổng hợp tăng trưởng hệ thống mỗi tuần</p>
-              </div>
-              <Switch
-                checked={settings.weeklyReports}
-                onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, weeklyReports: checked }))}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Định dạng</CardTitle>
+              <CardDescription>Nhập danh sách đuôi file, phân tách bằng dấu phẩy.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {extensionFields.map(([key, label]) => (
+                <div key={key} className="space-y-2">
+                  <Label htmlFor={key}>{label}</Label>
+                  <Input
+                    id={key}
+                    value={settings[key] ?? ""}
+                    onChange={(event) => updateField(key, event.target.value)}
+                    placeholder="mp4,webm,mov"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-col items-end gap-3">
-        {savedMessage && <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{savedMessage}</div>}
-        <Button onClick={handleSaveSettings}>Lưu thay đổi</Button>
+        {message && <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{message}</div>}
+        {error && <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div>}
+        <Button onClick={handleSaveSettings} disabled={saving || loading}>{saving ? "Đang lưu..." : "Lưu thay đổi"}</Button>
       </div>
     </AdminShell>
   )

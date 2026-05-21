@@ -43,10 +43,18 @@ type Question = {
 
 type QuizAttempt = {
   id: number
+  lesson_id: number
   score: number
   total_questions: number
   correct_count: number
   passed: boolean
+}
+
+type CourseSettings = {
+  lesson_completion_percent: number
+  default_quiz_pass_score: number
+  allow_quiz_retake: boolean
+  max_quiz_attempts: number
 }
 
 type ProgressOut = {
@@ -81,6 +89,8 @@ export default function LessonPage() {
   const [viewerRole, setViewerRole] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<number, "A" | "B" | "C" | "D">>({})
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null)
+  const [quizAttempts, setQuizAttempts] = useState<QuizAttempt[]>([])
+  const [courseSettings, setCourseSettings] = useState<CourseSettings | null>(null)
   const [lessonProgress, setLessonProgress] = useState<ProgressOut | null>(null)
   const [loading, setLoading] = useState(true)
   const [submittingQuiz, setSubmittingQuiz] = useState(false)
@@ -121,9 +131,11 @@ export default function LessonPage() {
         setCourse(courseRes.data)
         setLesson(lessonRes.data)
 
-        const [questionsRes, progressRes] = await Promise.allSettled([
+        const [questionsRes, progressRes, settingsRes, attemptsRes] = await Promise.allSettled([
           apiFetch<Question[]>(`/questions/lesson/${lessonId}`),
           currentUser.role === "student" ? apiFetch<ProgressOut>(`/lessons/${lessonId}/progress`) : Promise.resolve(null),
+          currentUser.role === "student" ? apiFetch<CourseSettings>(`/courses/${courseId}/settings`) : Promise.resolve(null),
+          currentUser.role === "student" ? apiFetch<QuizAttempt[]>("/quizzes/attempts/mine") : Promise.resolve(null),
         ])
 
         if (!alive) return
@@ -151,6 +163,12 @@ export default function LessonPage() {
         } else if (progressRes.status === "rejected") {
           setError(progressRes.reason instanceof Error ? progressRes.reason.message : "Không tải được tiến độ bài học")
         }
+        if (settingsRes.status === "fulfilled" && settingsRes.value) {
+          setCourseSettings(settingsRes.value.data)
+        }
+        if (attemptsRes.status === "fulfilled" && attemptsRes.value) {
+          setQuizAttempts(attemptsRes.value.data.filter((item) => item.lesson_id === lessonId))
+        }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Không tải được bài học")
       } finally {
@@ -172,10 +190,7 @@ export default function LessonPage() {
 
   async function saveVideoProgress(currentTime: number, duration: number, force = false) {
     if (!lesson || viewerRole !== "student" || !duration) return
-    const safeCurrentTime =
-      currentTime > maxWatchedRef.current + 1 && maxWatchedRef.current > 0
-        ? maxWatchedRef.current
-        : currentTime
+    const safeCurrentTime = Math.min(currentTime, duration)
     const maxWatchedSeconds = Math.min(duration, Math.max(maxWatchedRef.current, safeCurrentTime))
     const progressPercent = Math.min(100, Math.round((maxWatchedSeconds / duration) * 100))
     const now = Date.now()
@@ -220,14 +235,7 @@ export default function LessonPage() {
       return
     }
 
-    if (video.currentTime > maxWatchedRef.current + 1 && maxWatchedRef.current > 0) {
-      video.currentTime = maxWatchedRef.current
-      return
-    }
-
-    if (!correctingSeekRef.current) {
-      maxWatchedRef.current = Math.max(maxWatchedRef.current, video.currentTime)
-    }
+    maxWatchedRef.current = Math.max(maxWatchedRef.current, video.currentTime)
     void saveVideoProgress(video.currentTime, video.duration)
   }
 
@@ -309,14 +317,15 @@ export default function LessonPage() {
       })
 
       setAttempt(result.data)
+      setQuizAttempts((prev) => [result.data, ...prev])
       if (canStudy) {
         const progressResult = await apiFetch<ProgressOut>(`/lessons/${lessonId}/progress`)
         setLessonProgress(progressResult.data)
       }
       setMessage(
         result.data.passed
-          ? "Bạn đã đạt quiz. Nếu bài có video, hệ thống sẽ hoàn thành khi bạn xem đủ 90% video."
-          : "Bạn chưa đạt quiz. Bài có quiz cần đúng từ 80% trở lên."
+          ? `Bạn đã đạt quiz. Nếu bài có video, hệ thống sẽ hoàn thành khi bạn xem đủ ${courseSettings?.lesson_completion_percent ?? 90}% video.`
+          : `Bạn chưa đạt quiz. Bài có quiz cần đạt từ ${courseSettings?.default_quiz_pass_score ?? 80}% trở lên.`
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không nộp được quiz")
@@ -336,7 +345,7 @@ export default function LessonPage() {
       setMessage(
         result.data.is_completed
           ? "Đã ghi nhận hoàn thành bài học."
-          : "Đã ghi nhận xem tài liệu. Nếu bài có quiz, bạn cần đạt từ 80% trở lên để hoàn thành."
+          : `Đã ghi nhận xem tài liệu. Nếu bài có quiz, bạn cần đạt từ ${courseSettings?.default_quiz_pass_score ?? 80}% trở lên để hoàn thành.`
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể đánh dấu hoàn thành")
@@ -388,6 +397,11 @@ export default function LessonPage() {
   const progressPercent = Math.round(lessonProgress?.progress_percent ?? 0)
   const isCompleted = Boolean(lessonProgress?.is_completed)
   const statusLabel = isCompleted ? "Hoàn thành" : progressPercent > 0 ? "Đang học" : "Chưa bắt đầu"
+  const quizAttemptLimit = courseSettings ? (courseSettings.allow_quiz_retake ? courseSettings.max_quiz_attempts : 1) : null
+  const quizAttemptsUsed = quizAttempts.length
+  const latestQuizAttempt = attempt ?? quizAttempts[0] ?? null
+  const hasPassedQuiz = quizAttempts.some((item) => item.passed) || Boolean(attempt?.passed)
+  const quizAttemptsRemaining = quizAttemptLimit == null ? null : Math.max(0, quizAttemptLimit - quizAttemptsUsed)
 
   return (
     <div className="min-h-screen bg-background">
@@ -476,7 +490,7 @@ export default function LessonPage() {
                 )}
                 {!hasLearningContent && (
                   <p className="text-sm text-muted-foreground">
-                    Bài học này không có video hoặc tài liệu; hệ thống sẽ hoàn thành bài khi quiz đạt từ 80%.
+                    Bài học này không có video hoặc tài liệu; hệ thống sẽ hoàn thành bài khi quiz đạt từ {courseSettings?.default_quiz_pass_score ?? 80}%.
                   </p>
                 )}
               </div>
@@ -516,6 +530,30 @@ export default function LessonPage() {
                 </p>
               ) : (
                 <div className="space-y-5">
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                    <p>
+                      Điểm đạt quiz: {courseSettings?.default_quiz_pass_score ?? 80}%.
+                      {quizAttemptLimit ? ` Số lượt làm: ${quizAttemptsUsed}/${quizAttemptLimit}.` : ""}
+                    </p>
+                    {latestQuizAttempt && (
+                      <div className={`mt-2 rounded-md px-3 py-2 ${hasPassedQuiz ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-800"}`}>
+                        {hasPassedQuiz ? (
+                          <span className="inline-flex items-center gap-2 font-medium">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Đã hoàn thành quiz
+                          </span>
+                        ) : (
+                          <span>
+                            Chưa đạt quiz. Lần gần nhất: {latestQuizAttempt.score}/10.
+                            {quizAttemptsRemaining != null ? ` Còn ${quizAttemptsRemaining} lượt.` : ""}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {lesson.video_url && (
+                      <p className="mt-1">Bài học hoàn thành khi xem đủ {courseSettings?.lesson_completion_percent ?? 90}% video và đạt quiz.</p>
+                    )}
+                  </div>
                   <div>
                     <div className="mb-2 flex justify-between text-sm">
                       <span className="text-muted-foreground">Đã trả lời</span>
@@ -552,8 +590,8 @@ export default function LessonPage() {
                     </div>
                   ))}
 
-                  {canStudy && <Button className="w-full" onClick={handleSubmitQuiz} disabled={!quizReady || submittingQuiz}>
-                    {submittingQuiz ? "Đang nộp..." : "Nộp quiz"}
+                  {canStudy && <Button className="w-full" onClick={handleSubmitQuiz} disabled={!quizReady || submittingQuiz || hasPassedQuiz || quizAttemptsRemaining === 0}>
+                    {hasPassedQuiz ? "Đã hoàn thành quiz" : submittingQuiz ? "Đang nộp..." : "Nộp quiz"}
                   </Button>}
 
                   {attempt && (

@@ -51,7 +51,7 @@ def list_questions(
         select(Enrollment).where(
             Enrollment.student_id == current_user.id,
             Enrollment.course_id == lesson.course_id,
-            Enrollment.status == EnrollmentStatus.active,
+            Enrollment.status.in_([EnrollmentStatus.active, EnrollmentStatus.completed]),
         )
     )
     if not enrolled:

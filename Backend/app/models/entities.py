@@ -130,6 +130,17 @@ class User(Base, TimestampMixin):
     )
 
 
+class SystemSetting(Base, TimestampMixin):
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    key: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    value_type: Mapped[str] = mapped_column(String(20), nullable=False, default="string")
+    description: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
 class ReactivationRequest(Base, TimestampMixin):
     __tablename__ = "reactivation_requests"
 
@@ -168,6 +179,14 @@ class Course(Base, TimestampMixin):
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lesson_completion_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
+    default_quiz_pass_score: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
+    final_test_pass_score: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
+    allow_quiz_retake: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    max_quiz_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    allow_final_test_retake: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    max_final_test_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    require_final_test: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     instructor: Mapped[User] = relationship(back_populates="courses", foreign_keys=[instructor_id])
     reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_id])

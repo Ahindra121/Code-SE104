@@ -1,0 +1,33 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+Backend/.venv/
+
+# Backend runtime uploads
+Backend/uploads/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Logs and generated reports
+*.log
+Frontend/report_full.txt
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
