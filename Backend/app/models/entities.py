@@ -9,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -77,6 +78,19 @@ class AnswerOption(str, enum.Enum):
     B = "B"
     C = "C"
     D = "D"
+
+
+class FinalTestQuestionType(str, enum.Enum):
+    multiple_choice = "multiple_choice"
+    essay = "essay"
+
+
+class FinalTestSubmissionStatus(str, enum.Enum):
+    submitted = "submitted"
+    pending_grading = "pending_grading"
+    graded = "graded"
+    passed = "passed"
+    failed = "failed"
 
 
 class TimestampMixin:
@@ -160,9 +174,11 @@ class Course(Base, TimestampMixin):
     lessons: Mapped[list["Lesson"]] = relationship(back_populates="course", cascade="all, delete-orphan")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="course")
     progress_records: Mapped[list["LearningProgress"]] = relationship(back_populates="course")
+    course_progress_records: Mapped[list["CourseProgress"]] = relationship(back_populates="course")
     quiz_attempts: Mapped[list["QuizAttempt"]] = relationship(back_populates="course")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="course")
     reviews: Mapped[list["Review"]] = relationship(back_populates="course")
+    final_tests: Mapped[list["FinalTest"]] = relationship(back_populates="course", cascade="all, delete-orphan")
     deletion_requests: Mapped[list["CourseDeletionRequest"]] = relationship(
         back_populates="course", cascade="all, delete-orphan"
     )
@@ -311,6 +327,86 @@ class LearningProgress(Base):
     lesson: Mapped[Lesson] = relationship(back_populates="progress_records")
 
 
+class CourseProgress(Base):
+    __tablename__ = "course_progress"
+    __table_args__ = (UniqueConstraint("student_id", "course_id", name="uq_course_progress_student_course"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    final_score_percent: Mapped[float | None] = mapped_column(Float)
+    final_submission_id: Mapped[int | None] = mapped_column(ForeignKey("final_test_submissions.id", ondelete="SET NULL"))
+
+    course: Mapped[Course] = relationship(back_populates="course_progress_records")
+    student: Mapped[User] = relationship()
+
+
+class FinalTest(Base, TimestampMixin):
+    __tablename__ = "final_tests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    passing_score_percent: Mapped[float] = mapped_column(Float, nullable=False, default=70)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    course: Mapped[Course] = relationship(back_populates="final_tests")
+    questions: Mapped[list["FinalTestQuestion"]] = relationship(
+        back_populates="final_test", cascade="all, delete-orphan", order_by="FinalTestQuestion.order_index"
+    )
+    submissions: Mapped[list["FinalTestSubmission"]] = relationship(back_populates="final_test")
+
+
+class FinalTestQuestion(Base, TimestampMixin):
+    __tablename__ = "final_test_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    final_test_id: Mapped[int] = mapped_column(ForeignKey("final_tests.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    question_type: Mapped[FinalTestQuestionType] = mapped_column(
+        Enum(FinalTestQuestionType, name="final_test_question_type"), nullable=False
+    )
+    options: Mapped[dict | None] = mapped_column(JSON)
+    correct_answer: Mapped[str | None] = mapped_column(Text)
+    max_score: Mapped[float] = mapped_column(Float, nullable=False, default=1)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    final_test: Mapped[FinalTest] = relationship(back_populates="questions")
+
+
+class FinalTestSubmission(Base):
+    __tablename__ = "final_test_submissions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    final_test_id: Mapped[int] = mapped_column(ForeignKey("final_tests.id", ondelete="CASCADE"), nullable=False, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    answers: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    auto_score: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    manual_score: Mapped[float | None] = mapped_column(Float)
+    total_score: Mapped[float | None] = mapped_column(Float)
+    max_score: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    score_percent: Mapped[float | None] = mapped_column(Float)
+    status: Mapped[FinalTestSubmissionStatus] = mapped_column(
+        Enum(FinalTestSubmissionStatus, name="final_test_submission_status"),
+        nullable=False,
+        default=FinalTestSubmissionStatus.submitted,
+    )
+    instructor_feedback: Mapped[str | None] = mapped_column(Text)
+    graded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    graded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    final_test: Mapped[FinalTest] = relationship(back_populates="submissions")
+    course: Mapped[Course] = relationship()
+    student: Mapped[User] = relationship(foreign_keys=[student_id])
+    grader: Mapped[User | None] = relationship(foreign_keys=[graded_by])
+
+
 class Question(Base, TimestampMixin):
     __tablename__ = "questions"
 
@@ -381,14 +477,33 @@ class Review(Base):
     __table_args__ = (
         UniqueConstraint("student_id", "course_id", name="uq_review_student_course"),
         CheckConstraint("rating >= 1 AND rating <= 5", name="ck_review_rating_range"),
+        CheckConstraint("content_quality >= 1 AND content_quality <= 5", name="ck_review_content_quality_range"),
+        CheckConstraint("video_quality >= 1 AND video_quality <= 5", name="ck_review_video_quality_range"),
+        CheckConstraint("instructor_clarity >= 1 AND instructor_clarity <= 5", name="ck_review_instructor_clarity_range"),
+        CheckConstraint("material_usefulness >= 1 AND material_usefulness <= 5", name="ck_review_material_usefulness_range"),
+        CheckConstraint("assessment_quality >= 1 AND assessment_quality <= 5", name="ck_review_assessment_quality_range"),
+        CheckConstraint("practical_value >= 1 AND practical_value <= 5", name="ck_review_practical_value_range"),
+        CheckConstraint("overall_satisfaction >= 1 AND overall_satisfaction <= 5", name="ck_review_overall_satisfaction_range"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    content_quality: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    video_quality: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    instructor_clarity: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    material_usefulness: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    assessment_quality: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    practical_value: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    overall_satisfaction: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    average_rating: Mapped[float] = mapped_column(Float, nullable=False, default=5)
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     student: Mapped[User] = relationship(back_populates="reviews")
     course: Mapped[Course] = relationship(back_populates="reviews")

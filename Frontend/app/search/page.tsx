@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { Suspense, useState, useMemo, useEffect } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -281,7 +282,8 @@ function mapBackendCourse(course: BackendCourse) {
   }
 }
 
-export default function SearchPage() {
+function SearchContent() {
+  const searchParams = useSearchParams()
   const [courses, setCourses] = useState(allCourses)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [homeHref, setHomeHref] = useState("/")
@@ -294,6 +296,13 @@ export default function SearchPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [page, setPage] = useState(1)
   const pageSize = 6
+
+  useEffect(() => {
+    const keyword = searchParams.get("q") ?? ""
+    const category = searchParams.get("category")
+    setSearchQuery(keyword)
+    setSelectedCategories(category ? [category] : [])
+  }, [searchParams])
 
   useEffect(() => {
     const user = getStoredUser()
@@ -789,5 +798,13 @@ export default function SearchPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <SearchContent />
+    </Suspense>
   )
 }

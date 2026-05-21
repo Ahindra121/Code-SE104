@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { API_BASE_URL, apiFetch } from "@/lib/api"
 import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { getStoredUser, redirectPathForRole } from "@/lib/auth"
@@ -127,6 +127,83 @@ type QuestionForm = {
   correct_option: AnswerOption
 }
 
+type FinalQuestionType = "multiple_choice" | "essay"
+type FinalSubmissionStatus = "submitted" | "pending_grading" | "graded" | "passed" | "failed"
+
+type FinalTestQuestion = {
+  id: number
+  final_test_id: number
+  question_text: string
+  question_type: FinalQuestionType
+  options?: Record<string, string> | null
+  correct_answer?: string | null
+  max_score: number
+  order_index: number
+}
+
+type FinalTest = {
+  id: number
+  course_id: number
+  title: string
+  description?: string | null
+  passing_score_percent: number
+  is_active: boolean
+  questions: FinalTestQuestion[]
+}
+
+type FinalTestForm = {
+  title: string
+  description: string
+  passing_score_percent: string
+  is_active: boolean
+}
+
+type FinalTestQuestionForm = {
+  question_text: string
+  question_type: FinalQuestionType
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_answer: AnswerOption
+  max_score: string
+  order_index: string
+}
+
+type FinalTestSubmission = {
+  id: number
+  attempt_number: number
+  student_name?: string | null
+  student_email?: string | null
+  answers: { question_id: number; question_type: FinalQuestionType; answer: string; is_correct?: boolean | null; auto_score?: number | null }[]
+  auto_score: number
+  manual_score?: number | null
+  total_score?: number | null
+  max_score: number
+  score_percent?: number | null
+  status: FinalSubmissionStatus
+  instructor_feedback?: string | null
+  submitted_at: string
+  questions: FinalTestQuestion[]
+}
+
+type CourseReview = {
+  id: number
+  student_id: number
+  student_name?: string | null
+  average_rating: number
+  content_quality: number
+  video_quality: number
+  instructor_clarity: number
+  material_usefulness: number
+  assessment_quality: number
+  practical_value: number
+  overall_satisfaction: number
+  comment?: string | null
+  is_visible: boolean
+  created_at: string
+}
+
 const categories = ["IT", "Business", "Language", "Soft Skills"]
 const THUMBNAIL_ACCEPT = ".jpg,.jpeg,.png,.webp"
 const VIDEO_ACCEPT = ".mp4,.webm,.mov"
@@ -180,6 +257,35 @@ const emptyQuestionForm: QuestionForm = {
   option_d: "",
   correct_option: "A",
 }
+
+const emptyFinalTestForm: FinalTestForm = {
+  title: "Final Test cuối khóa",
+  description: "",
+  passing_score_percent: "70",
+  is_active: true,
+}
+
+const emptyFinalQuestionForm: FinalTestQuestionForm = {
+  question_text: "",
+  question_type: "multiple_choice",
+  option_a: "",
+  option_b: "",
+  option_c: "",
+  option_d: "",
+  correct_answer: "A",
+  max_score: "1",
+  order_index: "1",
+}
+
+const reviewCriteriaLabels: { key: keyof Pick<CourseReview, "content_quality" | "video_quality" | "instructor_clarity" | "material_usefulness" | "assessment_quality" | "practical_value" | "overall_satisfaction">; label: string }[] = [
+  { key: "content_quality", label: "Nội dung" },
+  { key: "video_quality", label: "Video" },
+  { key: "instructor_clarity", label: "Giảng viên" },
+  { key: "material_usefulness", label: "Tài liệu" },
+  { key: "assessment_quality", label: "Bài kiểm tra" },
+  { key: "practical_value", label: "Ứng dụng" },
+  { key: "overall_satisfaction", label: "Hài lòng" },
+]
 
 function statusLabel(status: CourseStatus) {
   const labels: Record<CourseStatus, string> = {
@@ -244,6 +350,7 @@ function assetUrl(url?: string | null) {
 export default function CourseEditorPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const isNewCourse = params.id === "new"
   const courseId = Number(params.id)
 
@@ -257,6 +364,15 @@ export default function CourseEditorPage() {
   const [lessonVideoFile, setLessonVideoFile] = useState<File | null>(null)
   const [lessonDocumentFile, setLessonDocumentFile] = useState<File | null>(null)
   const [questionForm, setQuestionForm] = useState<QuestionForm>(emptyQuestionForm)
+  const [finalTest, setFinalTest] = useState<FinalTest | null>(null)
+  const [finalTestForm, setFinalTestForm] = useState<FinalTestForm>(emptyFinalTestForm)
+  const [finalQuestionForm, setFinalQuestionForm] = useState<FinalTestQuestionForm>(emptyFinalQuestionForm)
+  const [finalSubmissions, setFinalSubmissions] = useState<FinalTestSubmission[]>([])
+  const [courseReviews, setCourseReviews] = useState<CourseReview[]>([])
+  const [manualScores, setManualScores] = useState<Record<number, string>>({})
+  const [feedbacks, setFeedbacks] = useState<Record<number, string>>({})
+  const [editingFinalQuestionId, setEditingFinalQuestionId] = useState<number | null>(null)
+  const [finalQuestionEditForm, setFinalQuestionEditForm] = useState<FinalTestQuestionForm>(emptyFinalQuestionForm)
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null)
   const [lessonEditForm, setLessonEditForm] = useState<LessonForm>(emptyLessonForm)
   const [lessonEditVideoFile, setLessonEditVideoFile] = useState<File | null>(null)
@@ -271,6 +387,10 @@ export default function CourseEditorPage() {
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false)
   const [savingLesson, setSavingLesson] = useState(false)
   const [savingQuestion, setSavingQuestion] = useState(false)
+  const [savingFinalTest, setSavingFinalTest] = useState(false)
+  const [savingFinalQuestion, setSavingFinalQuestion] = useState(false)
+  const [savingFinalQuestionEdit, setSavingFinalQuestionEdit] = useState(false)
+  const [gradingSubmissionId, setGradingSubmissionId] = useState<number | null>(null)
   const [savingLessonEdit, setSavingLessonEdit] = useState(false)
   const [uploadingLessonAsset, setUploadingLessonAsset] = useState<string | null>(null)
   const [savingQuestionEdit, setSavingQuestionEdit] = useState(false)
@@ -282,6 +402,7 @@ export default function CourseEditorPage() {
   const [savingVerification, setSavingVerification] = useState(false)
 
   const currentCourseId = course?.id ?? (Number.isFinite(courseId) ? courseId : null)
+  const initialTab = searchParams.get("tab") === "final-test" ? "final-test" : "info"
 
   useEffect(() => {
     const user = getStoredUser()
@@ -333,6 +454,33 @@ export default function CourseEditorPage() {
         )
 
         if (alive) setQuestionsByLesson(Object.fromEntries(questionEntries))
+
+        const [finalTestRes, submissionsRes, courseReviewsRes] = await Promise.allSettled([
+          apiFetch<FinalTest | null>(`/instructor/courses/${courseId}/final-test`),
+          apiFetch<FinalTestSubmission[]>(`/instructor/courses/${courseId}/final-test/submissions?status=pending_grading`),
+          apiFetch<CourseReview[]>(`/instructor/courses/${courseId}/reviews`),
+        ])
+        if (!alive) return
+        if (finalTestRes.status === "fulfilled" && finalTestRes.value.data) {
+          const loadedFinalTest = finalTestRes.value.data
+          setFinalTest(loadedFinalTest)
+          setFinalTestForm({
+            title: loadedFinalTest.title,
+            description: loadedFinalTest.description ?? "",
+            passing_score_percent: String(loadedFinalTest.passing_score_percent),
+            is_active: loadedFinalTest.is_active,
+          })
+          setFinalQuestionForm((prev) => ({
+            ...prev,
+            order_index: String((loadedFinalTest.questions?.length ?? 0) + 1),
+          }))
+        }
+        if (submissionsRes.status === "fulfilled") {
+          setFinalSubmissions(submissionsRes.value.data)
+        }
+        if (courseReviewsRes.status === "fulfilled") {
+          setCourseReviews(courseReviewsRes.value.data)
+        }
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : "Không tải được khóa học")
       } finally {
@@ -861,6 +1009,199 @@ export default function CourseEditorPage() {
     }
   }
 
+  async function handleSaveFinalTest() {
+    if (!currentCourseId) {
+      setError("Vui lòng lưu khóa học trước khi tạo Final Test")
+      return
+    }
+
+    try {
+      setSavingFinalTest(true)
+      setMessage(null)
+      setError(null)
+      const payload = {
+        title: finalTestForm.title.trim(),
+        description: finalTestForm.description.trim() || null,
+        passing_score_percent: Number(finalTestForm.passing_score_percent) || 70,
+        is_active: finalTestForm.is_active,
+      }
+      if (!payload.title) {
+        setError("Vui lòng nhập tên Final Test")
+        return
+      }
+      const result = await apiFetch<FinalTest>(
+        finalTest ? `/instructor/final-tests/${finalTest.id}` : `/instructor/courses/${currentCourseId}/final-test`,
+        {
+          method: finalTest ? "PATCH" : "POST",
+          body: JSON.stringify(payload),
+        }
+      )
+      setFinalTest(result.data)
+      setFinalQuestionForm((prev) => ({ ...prev, order_index: String((result.data.questions?.length ?? 0) + 1) }))
+      setMessage("Đã lưu Final Test.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không lưu được Final Test")
+    } finally {
+      setSavingFinalTest(false)
+    }
+  }
+
+  async function handleAddFinalQuestion() {
+    if (!finalTest) {
+      setError("Vui lòng tạo Final Test trước khi thêm câu hỏi")
+      return
+    }
+
+    try {
+      setSavingFinalQuestion(true)
+      setMessage(null)
+      setError(null)
+      const isMultipleChoice = finalQuestionForm.question_type === "multiple_choice"
+      const payload = {
+        question_text: finalQuestionForm.question_text.trim(),
+        question_type: finalQuestionForm.question_type,
+        options: isMultipleChoice
+          ? {
+              A: finalQuestionForm.option_a.trim(),
+              B: finalQuestionForm.option_b.trim(),
+              C: finalQuestionForm.option_c.trim(),
+              D: finalQuestionForm.option_d.trim(),
+            }
+          : null,
+        correct_answer: isMultipleChoice ? finalQuestionForm.correct_answer : null,
+        max_score: Number(finalQuestionForm.max_score) || 1,
+        order_index: Number(finalQuestionForm.order_index) || (finalTest.questions.length + 1),
+      }
+      if (!payload.question_text) {
+        setError("Vui lòng nhập nội dung câu hỏi Final Test")
+        return
+      }
+      if (isMultipleChoice && (!payload.options?.A || !payload.options?.B || !payload.options?.C || !payload.options?.D)) {
+        setError("Vui lòng nhập đủ 4 đáp án cho câu trắc nghiệm")
+        return
+      }
+      const result = await apiFetch<FinalTestQuestion>(`/instructor/final-tests/${finalTest.id}/questions`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+      setFinalTest((prev) => (prev ? { ...prev, questions: [...prev.questions, result.data] } : prev))
+      setFinalQuestionForm({ ...emptyFinalQuestionForm, order_index: String(finalTest.questions.length + 2) })
+      setMessage("Đã thêm câu hỏi Final Test.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thêm được câu hỏi Final Test")
+    } finally {
+      setSavingFinalQuestion(false)
+    }
+  }
+
+  function finalQuestionToForm(question: FinalTestQuestion): FinalTestQuestionForm {
+    return {
+      question_text: question.question_text,
+      question_type: question.question_type,
+      option_a: question.options?.A ?? "",
+      option_b: question.options?.B ?? "",
+      option_c: question.options?.C ?? "",
+      option_d: question.options?.D ?? "",
+      correct_answer: (question.correct_answer as AnswerOption) || "A",
+      max_score: String(question.max_score),
+      order_index: String(question.order_index),
+    }
+  }
+
+  function startEditFinalQuestion(question: FinalTestQuestion) {
+    setEditingFinalQuestionId(question.id)
+    setFinalQuestionEditForm(finalQuestionToForm(question))
+  }
+
+  function finalQuestionPayload(form: FinalTestQuestionForm) {
+    const isMultipleChoice = form.question_type === "multiple_choice"
+    return {
+      question_text: form.question_text.trim(),
+      question_type: form.question_type,
+      options: isMultipleChoice
+        ? {
+            A: form.option_a.trim(),
+            B: form.option_b.trim(),
+            C: form.option_c.trim(),
+            D: form.option_d.trim(),
+          }
+        : null,
+      correct_answer: isMultipleChoice ? form.correct_answer : null,
+      max_score: Number(form.max_score) || 1,
+      order_index: Number(form.order_index) || 1,
+    }
+  }
+
+  async function handleUpdateFinalQuestion(question: FinalTestQuestion) {
+    try {
+      setSavingFinalQuestionEdit(true)
+      setMessage(null)
+      setError(null)
+      const payload = finalQuestionPayload(finalQuestionEditForm)
+      if (!payload.question_text) {
+        setError("Vui lòng nhập nội dung câu hỏi Final Test")
+        return
+      }
+      if (payload.question_type === "multiple_choice" && (!payload.options?.A || !payload.options?.B || !payload.options?.C || !payload.options?.D)) {
+        setError("Vui lòng nhập đủ 4 đáp án cho câu trắc nghiệm")
+        return
+      }
+      const result = await apiFetch<FinalTestQuestion>(`/instructor/final-test-questions/${question.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      })
+      setFinalTest((prev) =>
+        prev ? { ...prev, questions: prev.questions.map((item) => (item.id === question.id ? result.data : item)) } : prev
+      )
+      setEditingFinalQuestionId(null)
+      setFinalQuestionEditForm(emptyFinalQuestionForm)
+      setMessage("Đã cập nhật câu hỏi Final Test.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không cập nhật được câu hỏi Final Test")
+    } finally {
+      setSavingFinalQuestionEdit(false)
+    }
+  }
+
+  async function handleDeleteFinalQuestion(question: FinalTestQuestion) {
+    if (!window.confirm("Xóa câu hỏi Final Test này?")) return
+
+    try {
+      setError(null)
+      await apiFetch(`/instructor/final-test-questions/${question.id}`, { method: "DELETE" })
+      setFinalTest((prev) => (prev ? { ...prev, questions: prev.questions.filter((item) => item.id !== question.id) } : prev))
+      if (editingFinalQuestionId === question.id) {
+        setEditingFinalQuestionId(null)
+        setFinalQuestionEditForm(emptyFinalQuestionForm)
+      }
+      setMessage("Đã xóa câu hỏi Final Test.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không xóa được câu hỏi Final Test")
+    }
+  }
+
+  async function handleGradeSubmission(submission: FinalTestSubmission) {
+    try {
+      setGradingSubmissionId(submission.id)
+      setMessage(null)
+      setError(null)
+      const result = await apiFetch<FinalTestSubmission>(`/instructor/final-test-submissions/${submission.id}/grade`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          manual_score: Number(manualScores[submission.id]) || 0,
+          instructor_feedback: feedbacks[submission.id]?.trim() || null,
+        }),
+      })
+      setFinalSubmissions((prev) => prev.filter((item) => item.id !== submission.id))
+      setManualScores((prev) => ({ ...prev, [submission.id]: String(result.data.manual_score ?? "") }))
+      setMessage(result.data.status === "passed" ? "Đã chấm bài. Học viên đã hoàn thành khóa học." : "Đã chấm bài.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không chấm được bài")
+    } finally {
+      setGradingSubmissionId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -955,11 +1296,13 @@ export default function CourseEditorPage() {
         )}
         {error && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
-        <Tabs defaultValue="info" className="space-y-6">
-          <TabsList className="grid w-full max-w-xl grid-cols-3">
+        <Tabs defaultValue={initialTab} className="space-y-6">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="info">Thông tin</TabsTrigger>
             <TabsTrigger value="lessons" disabled={!currentCourseId}>Bài giảng</TabsTrigger>
             <TabsTrigger value="questions" disabled={!currentCourseId}>Câu hỏi</TabsTrigger>
+            <TabsTrigger value="final-test" disabled={!currentCourseId}>Final Test</TabsTrigger>
+            <TabsTrigger value="reviews" disabled={!currentCourseId}>Đánh giá</TabsTrigger>
           </TabsList>
 
           <TabsContent value="info">
@@ -1440,6 +1783,347 @@ export default function CourseEditorPage() {
                             </div>
                           ))
                         )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reviews" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Chi tiết đánh giá khóa học</CardTitle>
+                <CardDescription>Giảng viên xem được điểm từng tiêu chí của học viên cho khóa học này.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {courseReviews.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">Chưa có đánh giá nào.</p>
+                ) : (
+                  courseReviews.map((review) => (
+                    <div key={review.id} className="rounded-lg border border-border p-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-foreground">{review.student_name || `Học viên #${review.student_id}`}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(review.created_at).toLocaleDateString("vi-VN")} • Trung bình {review.average_rating.toFixed(1)} / 5
+                          </p>
+                        </div>
+                        {!review.is_visible && <Badge variant="secondary">Đã bị admin ẩn</Badge>}
+                      </div>
+                      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                        {reviewCriteriaLabels.map((criteria) => (
+                          <div key={criteria.key} className="rounded-md bg-muted/40 px-3 py-2">
+                            {criteria.label}: <span className="font-medium">{review[criteria.key]} ★</span>
+                          </div>
+                        ))}
+                      </div>
+                      {review.comment && <p className="mt-3 text-sm text-muted-foreground">{review.comment}</p>}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="final-test" className="space-y-6">
+            <Card className="border-primary/30 bg-primary/5">
+              <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle>Chấm bài Final Test</CardTitle>
+                  <CardDescription>
+                    {finalSubmissions.length > 0
+                      ? `Có ${finalSubmissions.length} bài tự luận đang chờ chấm.`
+                      : "Hiện chưa có bài tự luận nào chờ chấm."}
+                  </CardDescription>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href="#final-test-grading">Đi đến khu vực chấm bài</a>
+                </Button>
+              </CardHeader>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Final Test cuối khóa</CardTitle>
+                <CardDescription>Học viên chỉ làm được bài này sau khi hoàn thành toàn bộ bài học.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Tên bài kiểm tra</Label>
+                  <Input value={finalTestForm.title} onChange={(e) => setFinalTestForm((prev) => ({ ...prev, title: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Điểm đạt (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={finalTestForm.passing_score_percent}
+                    onChange={(e) => setFinalTestForm((prev) => ({ ...prev, passing_score_percent: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <Label>Mô tả</Label>
+                  <Textarea value={finalTestForm.description} onChange={(e) => setFinalTestForm((prev) => ({ ...prev, description: e.target.value }))} rows={3} />
+                </div>
+                <div className="lg:col-span-2">
+                  <Button onClick={handleSaveFinalTest} disabled={savingFinalTest}>
+                    <Save className="mr-2 h-4 w-4" />
+                    {savingFinalTest ? "Đang lưu..." : finalTest ? "Cập nhật Final Test" : "Tạo Final Test"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Thêm câu hỏi Final Test</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Loại câu hỏi</Label>
+                    <Select value={finalQuestionForm.question_type} onValueChange={(value: FinalQuestionType) => setFinalQuestionForm((prev) => ({ ...prev, question_type: value }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="multiple_choice">Trắc nghiệm</SelectItem>
+                        <SelectItem value="essay">Tự luận</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Điểm tối đa</Label>
+                    <Input value={finalQuestionForm.max_score} type="number" min="0.1" step="0.1" onChange={(e) => setFinalQuestionForm((prev) => ({ ...prev, max_score: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Thứ tự</Label>
+                    <Input value={finalQuestionForm.order_index} type="number" min="1" onChange={(e) => setFinalQuestionForm((prev) => ({ ...prev, order_index: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nội dung câu hỏi</Label>
+                  <Textarea value={finalQuestionForm.question_text} onChange={(e) => setFinalQuestionForm((prev) => ({ ...prev, question_text: e.target.value }))} rows={3} />
+                </div>
+                {finalQuestionForm.question_type === "multiple_choice" && (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {(["a", "b", "c", "d"] as const).map((key) => {
+                        const option = key.toUpperCase() as AnswerOption
+                        const field = `option_${key}` as keyof FinalTestQuestionForm
+                        return (
+                          <div key={key} className="space-y-2">
+                            <Label>Đáp án {option}</Label>
+                            <Input value={finalQuestionForm[field]} onChange={(e) => setFinalQuestionForm((prev) => ({ ...prev, [field]: e.target.value }))} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Đáp án đúng</Label>
+                      <Select value={finalQuestionForm.correct_answer} onValueChange={(value: AnswerOption) => setFinalQuestionForm((prev) => ({ ...prev, correct_answer: value }))}>
+                        <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(["A", "B", "C", "D"] as const).map((option) => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+                <Button onClick={handleAddFinalQuestion} disabled={!finalTest || savingFinalQuestion}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {savingFinalQuestion ? "Đang thêm..." : "Thêm câu hỏi Final Test"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Danh sách câu hỏi Final Test</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!finalTest || finalTest.questions.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">Chưa có câu hỏi Final Test.</p>
+                ) : (
+                  finalTest.questions
+                    .slice()
+                    .sort((a, b) => a.order_index - b.order_index)
+                    .map((question) => (
+                      <div key={question.id} className="rounded-lg border border-border p-4">
+                        {editingFinalQuestionId === question.id ? (
+                          <div className="space-y-4">
+                            <div className="grid gap-4 lg:grid-cols-3">
+                              <div className="space-y-2">
+                                <Label>Loại câu hỏi</Label>
+                                <Select
+                                  value={finalQuestionEditForm.question_type}
+                                  onValueChange={(value: FinalQuestionType) => setFinalQuestionEditForm((prev) => ({ ...prev, question_type: value }))}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="multiple_choice">Trắc nghiệm</SelectItem>
+                                    <SelectItem value="essay">Tự luận</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Điểm tối đa</Label>
+                                <Input
+                                  value={finalQuestionEditForm.max_score}
+                                  type="number"
+                                  min="0.1"
+                                  step="0.1"
+                                  onChange={(e) => setFinalQuestionEditForm((prev) => ({ ...prev, max_score: e.target.value }))}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Thứ tự</Label>
+                                <Input
+                                  value={finalQuestionEditForm.order_index}
+                                  type="number"
+                                  min="1"
+                                  onChange={(e) => setFinalQuestionEditForm((prev) => ({ ...prev, order_index: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Nội dung câu hỏi</Label>
+                              <Textarea
+                                value={finalQuestionEditForm.question_text}
+                                onChange={(e) => setFinalQuestionEditForm((prev) => ({ ...prev, question_text: e.target.value }))}
+                                rows={3}
+                              />
+                            </div>
+                            {finalQuestionEditForm.question_type === "multiple_choice" && (
+                              <>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  {(["a", "b", "c", "d"] as const).map((key) => {
+                                    const option = key.toUpperCase() as AnswerOption
+                                    const field = `option_${key}` as keyof FinalTestQuestionForm
+                                    return (
+                                      <div key={key} className="space-y-2">
+                                        <Label>Đáp án {option}</Label>
+                                        <Input
+                                          value={finalQuestionEditForm[field]}
+                                          onChange={(e) => setFinalQuestionEditForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                                        />
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Đáp án đúng</Label>
+                                  <Select
+                                    value={finalQuestionEditForm.correct_answer}
+                                    onValueChange={(value: AnswerOption) => setFinalQuestionEditForm((prev) => ({ ...prev, correct_answer: value }))}
+                                  >
+                                    <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {(["A", "B", "C", "D"] as const).map((option) => (
+                                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" onClick={() => handleUpdateFinalQuestion(question)} disabled={savingFinalQuestionEdit}>
+                                <Save className="mr-2 h-4 w-4" />
+                                {savingFinalQuestionEdit ? "Đang lưu..." : "Lưu câu hỏi"}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setEditingFinalQuestionId(null)}>
+                                <X className="mr-2 h-4 w-4" />
+                                Hủy
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="font-medium text-foreground">Câu {question.order_index}: {question.question_text}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {question.question_type === "multiple_choice" ? `Trắc nghiệm • Đáp án đúng: ${question.correct_answer}` : "Tự luận"} • {question.max_score} điểm
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{question.question_type === "multiple_choice" ? "Trắc nghiệm" : "Tự luận"}</Badge>
+                              <Button variant="outline" size="sm" onClick={() => startEditFinalQuestion(question)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteFinalQuestion(question)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card id="final-test-grading">
+              <CardHeader>
+                <CardTitle>Bài tự luận chờ chấm</CardTitle>
+                <CardDescription>Nhập điểm phần tự luận; hệ thống tự cộng với điểm trắc nghiệm.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {finalSubmissions.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">Không có bài nào đang chờ chấm.</p>
+                ) : (
+                  finalSubmissions.map((submission) => (
+                    <div key={submission.id} className="rounded-lg border border-border p-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-foreground">{submission.student_name || submission.student_email || `Học viên #${submission.id}`}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Lần {submission.attempt_number} • Nộp {new Date(submission.submitted_at).toLocaleString("vi-VN")} • Trắc nghiệm {submission.auto_score}/{submission.max_score}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Chờ chấm</Badge>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        {submission.answers
+                          .filter((answer) => answer.question_type === "essay")
+                          .map((answer) => {
+                            const question = submission.questions.find((item) => item.id === answer.question_id)
+                            return (
+                              <div key={answer.question_id} className="rounded-md bg-muted/40 p-3">
+                                <p className="font-medium">{question?.question_text || `Câu hỏi #${answer.question_id}`}</p>
+                                <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{answer.answer}</p>
+                              </div>
+                            )
+                          })}
+                      </div>
+
+                      <div className="mt-4 grid gap-4 lg:grid-cols-[180px_1fr_auto]">
+                        <div className="space-y-2">
+                          <Label>Điểm tự luận</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={manualScores[submission.id] ?? ""}
+                            onChange={(e) => setManualScores((prev) => ({ ...prev, [submission.id]: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Feedback</Label>
+                          <Input
+                            value={feedbacks[submission.id] ?? ""}
+                            onChange={(e) => setFeedbacks((prev) => ({ ...prev, [submission.id]: e.target.value }))}
+                            placeholder="Nhận xét cho học viên"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button onClick={() => handleGradeSubmission(submission)} disabled={gradingSubmissionId === submission.id}>
+                            {gradingSubmissionId === submission.id ? "Đang chấm..." : "Chấm bài"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))

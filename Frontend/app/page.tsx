@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
 import { getCourseThumbnailUrl } from "@/lib/course-thumbnail"
 import { Button } from "@/components/ui/button"
@@ -62,6 +63,7 @@ function instructorName(course: Course) {
 }
 
 export default function HomePage() {
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [courses, setCourses] = useState<Course[]>([])
   const [totalCourses, setTotalCourses] = useState(0)
@@ -121,7 +123,7 @@ export default function HomePage() {
             <div className="hidden flex-1 max-w-xl md:flex">
               <form action="/search" className="relative w-full">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input name="q" type="search" placeholder="Tìm khóa học..." className="w-full border-0 bg-secondary pl-10" />
+                <Input name="q" type="search" placeholder="Tìm khóa học..." className="w-full border-0 bg-secondary pl-10" onFocus={() => router.push("/search")} />
               </form>
             </div>
 
@@ -151,7 +153,7 @@ export default function HomePage() {
             <div className="space-y-4 p-4">
               <form action="/search" className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input name="q" type="search" placeholder="Tìm khóa học..." className="w-full border-0 bg-secondary pl-10" />
+                <Input name="q" type="search" placeholder="Tìm khóa học..." className="w-full border-0 bg-secondary pl-10" onFocus={() => router.push("/search")} />
               </form>
               <div className="flex flex-col gap-2">
                 <Link href="/dashboard" className="py-2 text-sm font-medium">Bảng điều khiển</Link>

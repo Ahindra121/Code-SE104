@@ -8,9 +8,6 @@ from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{6,}$")
-
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -37,4 +34,4 @@ def validate_password_strength(password: str) -> bool:
 
 
 def validate_username(username: str) -> bool:
-    return bool(USERNAME_RE.fullmatch(username))
+    return len(username.strip()) >= 6

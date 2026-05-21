@@ -59,7 +59,12 @@ def instructor_report(db: Session = Depends(get_db), current_user: User = Depend
         total_lessons = db.scalar(select(func.count(LearningProgress.id)).where(LearningProgress.course_id == course.id)) or 0
         completed = db.scalar(select(func.count(LearningProgress.id)).where(LearningProgress.course_id == course.id, LearningProgress.is_completed.is_(True))) or 0
         revenue = float(course.price or 0) * students
-        rating = db.scalar(select(func.coalesce(func.avg(Review.rating), 0)).where(Review.course_id == course.id)) or 0
+        rating = db.scalar(
+            select(func.coalesce(func.avg(Review.average_rating), 0)).where(
+                Review.course_id == course.id,
+                Review.is_visible.is_(True),
+            )
+        ) or 0
         data.append({
             "course_id": course.id,
             "title": course.title,

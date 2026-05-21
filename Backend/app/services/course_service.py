@@ -10,7 +10,10 @@ from app.schemas.user import UserOut
 
 def course_to_out(db: Session, course: Course) -> CourseOut:
     rating, reviews_count = db.execute(
-        select(func.coalesce(func.avg(Review.rating), 0), func.count(Review.id)).where(Review.course_id == course.id)
+        select(func.coalesce(func.avg(Review.average_rating), 0), func.count(Review.id)).where(
+            Review.course_id == course.id,
+            Review.is_visible.is_(True),
+        )
     ).one()
     students_count = db.scalar(
         select(func.count(Enrollment.id)).where(

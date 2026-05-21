@@ -1,7 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -25,21 +26,35 @@ def _deletion_retention_expired(user: User) -> bool:
 
 @router.post("/register")
 def register(payload: UserCreate, db: Session = Depends(get_db)):
-    if db.scalar(select(User).where(User.email == payload.email)):
+    email = str(payload.email).lower()
+    username = payload.username.strip()
+
+    if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email đã tồn tại")
-    if db.scalar(select(User).where(User.username == payload.username)):
+    if db.scalar(select(User).where(func.lower(User.username) == username.lower())):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Tên tài khoản đã tồn tại")
 
     user = User(
-        email=payload.email,
-        username=payload.username,
+        email=email,
+        username=username,
         full_name=payload.full_name,
         phone=payload.phone,
         hashed_password=get_password_hash(payload.password),
         role=payload.role,
     )
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        message = str(exc.orig).lower()
+        if "email" in message:
+            detail = "Email đã tồn tại"
+        elif "username" in message:
+            detail = "Tên tài khoản đã tồn tại"
+        else:
+            detail = "Email hoặc tên tài khoản đã tồn tại"
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail) from exc
     db.refresh(user)
     return ok(UserOut.model_validate(user), "Đăng ký thành công")
 

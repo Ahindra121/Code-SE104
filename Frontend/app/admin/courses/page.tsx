@@ -10,7 +10,7 @@ import { getStoredToken, getStoredUser, redirectPathForRole } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Check, Eye, XCircle, BookOpen, Clock, UserRound } from "lucide-react"
+import { Check, Eye, Star, XCircle, BookOpen, Clock, UserRound } from "lucide-react"
 
 type CourseStatus = "draft" | "pending" | "pending_review" | "approved" | "rejected" | "hidden" | "archived"
 
@@ -56,6 +56,33 @@ type CourseReviewInfo = {
   } | null
 }
 
+type CourseReview = {
+  id: number
+  student_id: number
+  student_name?: string | null
+  average_rating: number
+  content_quality: number
+  video_quality: number
+  instructor_clarity: number
+  material_usefulness: number
+  assessment_quality: number
+  practical_value: number
+  overall_satisfaction: number
+  comment?: string | null
+  is_visible: boolean
+  created_at: string
+}
+
+const reviewCriteriaLabels: { key: keyof Pick<CourseReview, "content_quality" | "video_quality" | "instructor_clarity" | "material_usefulness" | "assessment_quality" | "practical_value" | "overall_satisfaction">; label: string }[] = [
+  { key: "content_quality", label: "Nội dung" },
+  { key: "video_quality", label: "Video" },
+  { key: "instructor_clarity", label: "Giảng viên" },
+  { key: "material_usefulness", label: "Tài liệu" },
+  { key: "assessment_quality", label: "Bài kiểm tra" },
+  { key: "practical_value", label: "Ứng dụng" },
+  { key: "overall_satisfaction", label: "Hài lòng" },
+]
+
 function instructorName(course: Course) {
   return course.instructor?.full_name || course.instructor?.username || `Instructor #${course.instructor_id}`
 }
@@ -96,6 +123,9 @@ export default function AdminCoursesPage() {
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState<number | null>(null)
   const [reviewInfos, setReviewInfos] = useState<Record<number, CourseReviewInfo>>({})
+  const [expandedReviewCourseId, setExpandedReviewCourseId] = useState<number | null>(null)
+  const [courseReviews, setCourseReviews] = useState<Record<number, CourseReview[]>>({})
+  const [loadingReviewCourseId, setLoadingReviewCourseId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -162,6 +192,42 @@ export default function AdminCoursesPage() {
       setError(err instanceof Error ? err.message : "Không cập nhật được trạng thái khóa học")
     } finally {
       setActionId(null)
+    }
+  }
+
+  async function loadCourseReviews(courseId: number) {
+    if (expandedReviewCourseId === courseId) {
+      setExpandedReviewCourseId(null)
+      return
+    }
+    try {
+      setExpandedReviewCourseId(courseId)
+      setLoadingReviewCourseId(courseId)
+      setError(null)
+      const result = await apiFetch<CourseReview[]>(`/admin/courses/${courseId}/reviews`)
+      setCourseReviews((prev) => ({ ...prev, [courseId]: result.data }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được đánh giá khóa học")
+    } finally {
+      setLoadingReviewCourseId(null)
+    }
+  }
+
+  async function toggleReviewVisibility(courseId: number, review: CourseReview) {
+    try {
+      setError(null)
+      const result = await apiFetch<CourseReview>(`/admin/reviews/${review.id}/visibility`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_visible: !review.is_visible }),
+      })
+      setCourseReviews((prev) => ({
+        ...prev,
+        [courseId]: (prev[courseId] ?? []).map((item) => (item.id === review.id ? result.data : item)),
+      }))
+      setMessage(result.data.is_visible ? "Đã hiện đánh giá. Rating sẽ tính lại theo đánh giá này." : "Đã ẩn đánh giá. Rating sẽ không tính đánh giá này.")
+      await loadCourses()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không cập nhật được trạng thái đánh giá")
     }
   }
 
@@ -311,20 +377,61 @@ export default function AdminCoursesPage() {
         <CardContent>
           <div className="space-y-3">
             {courses.map((course) => (
-              <div key={course.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-foreground">{course.title}</p>
-                    <Badge className={statusClass(course.status)}>{statusLabel(course.status)}</Badge>
+              <div key={course.id} className="rounded-lg border border-border p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-foreground">{course.title}</p>
+                      <Badge className={statusClass(course.status)}>{statusLabel(course.status)}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {instructorName(course)} • {course.category} • {course.lessons_count} bài học • {course.rating.toFixed(1)} ★ ({course.reviews_count})
+                    </p>
+                    {course.rejection_reason && <p className="mt-1 text-sm text-destructive">Lý do từ chối: {course.rejection_reason}</p>}
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {instructorName(course)} • {course.category} • {course.lessons_count} bài học
-                  </p>
-                  {course.rejection_reason && <p className="mt-1 text-sm text-destructive">Lý do từ chối: {course.rejection_reason}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => loadCourseReviews(course.id)}>
+                      <Star className="mr-2 h-4 w-4" />
+                      Đánh giá
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/course/${course.id}?returnTo=/admin/courses`}>Xem</Link>
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/course/${course.id}?returnTo=/admin/courses`}>Xem</Link>
-                </Button>
+                {expandedReviewCourseId === course.id && (
+                  <div className="mt-4 space-y-3 rounded-lg bg-muted/30 p-4">
+                    {loadingReviewCourseId === course.id ? (
+                      <p className="text-sm text-muted-foreground">Đang tải đánh giá...</p>
+                    ) : (courseReviews[course.id] ?? []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Khóa học chưa có đánh giá.</p>
+                    ) : (
+                      (courseReviews[course.id] ?? []).map((review) => (
+                        <div key={review.id} className="rounded-lg border border-border bg-background p-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="font-semibold">{review.student_name || `Học viên #${review.student_id}`}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(review.created_at).toLocaleDateString("vi-VN")} • Trung bình {review.average_rating.toFixed(1)} / 5
+                              </p>
+                            </div>
+                            <Button variant={review.is_visible ? "outline" : "default"} size="sm" onClick={() => toggleReviewVisibility(course.id, review)}>
+                              {review.is_visible ? "Ẩn đánh giá" : "Hiện đánh giá"}
+                            </Button>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                            {reviewCriteriaLabels.map((criteria) => (
+                              <div key={criteria.key} className="rounded-md bg-muted/40 px-3 py-2">
+                                {criteria.label}: <span className="font-medium">{review[criteria.key]} ★</span>
+                              </div>
+                            ))}
+                          </div>
+                          {review.comment && <p className="mt-3 text-sm text-muted-foreground">{review.comment}</p>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -333,4 +440,3 @@ export default function AdminCoursesPage() {
     </AdminShell>
   )
 }
-

@@ -16,6 +16,7 @@ import {
   BarChart3,
   BookOpen,
   BadgeCheck,
+  ClipboardCheck,
   Edit,
   Eye,
   Filter,
@@ -398,6 +399,12 @@ export default function InstructorCoursesPage() {
                         </div>
 
                         <div className="flex items-center gap-2 self-end xl:self-center">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/instructor/course/${course.id}?tab=final-test#final-test-grading`}>
+                              <ClipboardCheck className="mr-2 h-4 w-4" />
+                              Chấm Final Test
+                            </Link>
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-9 w-9" asChild>
                             <Link href={`/course/${course.id}`}>
                               <Eye className="h-4 w-4" />
@@ -440,6 +447,5 @@ export default function InstructorCoursesPage() {
     </div>
   )
 }
-
 
 

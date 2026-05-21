@@ -22,8 +22,9 @@ class UserCreate(UserBase):
     @field_validator("username")
     @classmethod
     def username_valid(cls, value: str) -> str:
+        value = value.strip()
         if not validate_username(value):
-            raise ValueError("Tên tài khoản phải có ít nhất 6 ký tự và chỉ gồm chữ cái, số hoặc dấu gạch dưới")
+            raise ValueError("Tên tài khoản phải có ít nhất 6 ký tự")
         return value
 
     @field_validator("password")

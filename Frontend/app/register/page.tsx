@@ -21,7 +21,7 @@ import {
   Check,
   X,
 } from "lucide-react"
-import { apiFetch } from "@/lib/api"
+import { ApiError, apiFetch } from "@/lib/api"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -76,12 +76,10 @@ export default function RegisterPage() {
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.username) {
+    if (!formData.username.trim()) {
       newErrors.username = "Vui lòng nhập tên tài khoản"
-    } else if (formData.username.length < 6) {
+    } else if (formData.username.trim().length < 6) {
       newErrors.username = "Tên tài khoản phải có ít nhất 6 ký tự"
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-      newErrors.username = "Tên tài khoản chỉ được chứa chữ cái, số và dấu gạch dưới"
     }
 
     if (!formData.password) {
@@ -124,16 +122,20 @@ export default function RegisterPage() {
           full_name: formData.fullName,
           phone: formData.phone,
           email: formData.email,
-          username: formData.username,
+          username: formData.username.trim(),
           password: formData.password,
           role: formData.role,
         }),
       })
       router.push("/login?registered=true")
     } catch (error) {
-      setErrors({
-        username: error instanceof Error ? error.message : "Không thể đăng ký tài khoản",
-      })
+      const message = error instanceof Error ? error.message : "Không thể đăng ký tài khoản"
+      if (error instanceof ApiError && error.status === 409 && message.toLowerCase().includes("email")) {
+        setStep(1)
+        setErrors({ email: message })
+      } else {
+        setErrors({ username: message })
+      }
     } finally {
       setIsLoading(false)
     }
@@ -338,7 +340,7 @@ export default function RegisterPage() {
                         <p className="text-sm text-destructive">{errors.username}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Ít nhất 6 ký tự, chỉ chứa chữ cái, số và dấu gạch dưới
+                        Ít nhất 6 ký tự
                       </p>
                     </div>
 
