@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    supabase_course_assets_bucket: str = "course-assets"
+    supabase_lesson_files_bucket: str = "lesson-files"
+    supabase_verification_files_bucket: str = "verification-files"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 

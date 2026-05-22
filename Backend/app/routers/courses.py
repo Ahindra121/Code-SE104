@@ -1,7 +1,4 @@
-import unicodedata
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import and_, func, or_, select
@@ -33,14 +30,14 @@ from app.schemas.course import (
     CourseModeration,
     CourseUpdate,
 )
+from app.core.config import settings
 from app.services.course_service import assert_course_owner, course_to_out
 from app.services.settings_service import get_extensions_setting, get_int_setting
+from app.services.storage_service import delete_storage_file, upload_file_to_storage
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 CONTENT_RESTORE_DAYS = 30
 REVIEW_STATUSES = [CourseStatus.pending, CourseStatus.pending_review]
-UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
-THUMBNAIL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 def _now() -> datetime:
@@ -64,53 +61,24 @@ def _active_student_count(db: Session, course_id: int) -> int:
     ) or 0
 
 
-def _safe_filename(filename: str) -> str:
-    normalized = unicodedata.normalize("NFKD", Path(filename).name)
-    ascii_name = normalized.encode("ascii", "ignore").decode("ascii").replace(" ", "_")
-    return "".join(char for char in ascii_name if char.isalnum() or char in "._-") or "thumbnail"
-
-
 def _delete_upload(url: str | None) -> None:
-    if not url or not url.startswith("/uploads/"):
-        return
-    path = (UPLOAD_ROOT.parent / url.lstrip("/")).resolve()
-    if UPLOAD_ROOT not in path.parents:
-        return
-    if path.is_file():
-        path.unlink(missing_ok=True)
+    delete_storage_file(url, settings.supabase_course_assets_bucket)
 
 
 async def _save_thumbnail(db: Session, file: UploadFile, course_id: int) -> str:
-    extension = Path(file.filename or "").suffix.lower()
     allowed_extensions = get_extensions_setting(db, "allowed_thumbnail_extensions")
-    if extension not in allowed_extensions:
-        allowed = ", ".join(sorted(item.lstrip(".") for item in allowed_extensions))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Dinh dang anh khoa hoc khong duoc ho tro. Dinh dang cho phep: {allowed}")
     max_size_mb = get_int_setting(db, "max_thumbnail_size_mb")
-
-    upload_dir = UPLOAD_ROOT / "courses" / f"course_{course_id}" / "thumbnail"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    destination = upload_dir / f"{uuid4().hex}_{_safe_filename(file.filename or f'thumbnail{extension}')}"
-
-    size = 0
-    try:
-        with destination.open("wb") as output:
-            while chunk := await file.read(1024 * 1024):
-                size += len(chunk)
-                if size > max_size_mb * 1024 * 1024:
-                    output.close()
-                    destination.unlink(missing_ok=True)
-                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"Anh dai dien khoa hoc vuot qua dung luong toi da {max_size_mb}MB")
-                output.write(chunk)
-    except HTTPException:
-        raise
-    except OSError as exc:
-        destination.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload anh dai dien khoa hoc that bai") from exc
-    finally:
-        await file.close()
-
-    return "/" + destination.relative_to(UPLOAD_ROOT.parent).as_posix()
+    url, _, _ = await upload_file_to_storage(
+        file=file,
+        folder=f"courses/course_{course_id}/thumbnail",
+        allowed_extensions=allowed_extensions,
+        max_size=max_size_mb * 1024 * 1024,
+        invalid_message="Dinh dang anh khoa hoc khong duoc ho tro",
+        size_message=f"Anh dai dien khoa hoc vuot qua dung luong toi da {max_size_mb}MB",
+        bucket=settings.supabase_course_assets_bucket,
+        public=True,
+    )
+    return url
 
 
 def _can_view_deleted_course(db: Session, course: Course, user: User | None) -> bool:

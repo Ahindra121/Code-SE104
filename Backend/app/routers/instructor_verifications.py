@@ -1,13 +1,11 @@
-import unicodedata
 from datetime import UTC, datetime
-from pathlib import Path
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.entities import (
@@ -21,60 +19,27 @@ from app.models.entities import (
 from app.schemas.common import ok
 from app.schemas.instructor_verification import InstructorVerificationOut, InstructorVerificationReject
 from app.services.settings_service import get_extensions_setting, get_int_setting
+from app.services.storage_service import create_signed_url, upload_file_to_storage
 
 router = APIRouter(prefix="/instructor-verifications", tags=["Instructor Verifications"])
-
-UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
-VERIFICATION_UPLOAD_ROOT = UPLOAD_ROOT / "verifications"
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _safe_filename(filename: str) -> str:
-    normalized = unicodedata.normalize("NFKD", Path(filename).name)
-    ascii_name = normalized.encode("ascii", "ignore").decode("ascii").replace(" ", "_")
-    return "".join(char for char in ascii_name if char.isalnum() or char in "._-") or "upload"
-
-
-async def _save_verification_file(db: Session, file: UploadFile, destination_dir: Path) -> str:
-    extension = Path(file.filename or "").suffix.lower()
-    allowed_extensions = get_extensions_setting(db, "allowed_verification_extensions")
-    if extension not in allowed_extensions:
-        allowed = ", ".join(sorted(item.lstrip(".") for item in allowed_extensions))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Dinh dang file xac minh khong duoc ho tro. Dinh dang cho phep: {allowed}")
+async def _save_verification_file(db: Session, file: UploadFile, folder: str) -> str:
     max_size_mb = get_int_setting(db, "max_verification_file_size_mb")
-
-    destination_dir.mkdir(parents=True, exist_ok=True)
-    destination = destination_dir / f"{uuid4().hex}_{_safe_filename(file.filename or f'upload{extension}')}"
-    size = 0
-    try:
-        with destination.open("wb") as output:
-            while chunk := await file.read(1024 * 1024):
-                size += len(chunk)
-                if size > max_size_mb * 1024 * 1024:
-                    output.close()
-                    destination.unlink(missing_ok=True)
-                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=f"Moi file xac minh vuot qua dung luong toi da {max_size_mb}MB")
-                output.write(chunk)
-    except HTTPException:
-        raise
-    except OSError as exc:
-        destination.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload file xac minh that bai") from exc
-    finally:
-        await file.close()
-
-    return "/" + destination.relative_to(UPLOAD_ROOT.parent).as_posix()
-
-
-def _file_path(url: str) -> Path | None:
-    if not url.startswith("/uploads/verifications/"):
-        return None
-    path = (UPLOAD_ROOT.parent / url.lstrip("/")).resolve()
-    if VERIFICATION_UPLOAD_ROOT not in path.parents:
-        return None
+    path, _, _ = await upload_file_to_storage(
+        file=file,
+        folder=folder,
+        allowed_extensions=get_extensions_setting(db, "allowed_verification_extensions"),
+        max_size=max_size_mb * 1024 * 1024,
+        invalid_message="Dinh dang file xac minh khong duoc ho tro",
+        size_message=f"Moi file xac minh vuot qua dung luong toi da {max_size_mb}MB",
+        bucket=settings.supabase_verification_files_bucket,
+        public=False,
+    )
     return path
 
 
@@ -112,7 +77,7 @@ async def submit_verification(
         .where(InstructorVerification.user_id == current_user.id)
     ).unique().first()
     is_existing_approved = bool(verification and verification.status == InstructorVerificationStatus.approved)
-    upload_dir = VERIFICATION_UPLOAD_ROOT / f"user_{current_user.id}"
+    upload_dir = f"verifications/user_{current_user.id}"
 
     if not verification:
         if not cccd_front_file or not cccd_back_file or not degree_file:
@@ -243,10 +208,9 @@ def view_verification_file(
         "degree": verification.degree_url,
     }
     url = url_by_kind.get(file_kind)
-    path = _file_path(url or "") if url else None
-    if not path or not path.is_file():
+    if not url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Khong tim thay file xac minh")
-    return FileResponse(path, filename=path.name)
+    return RedirectResponse(create_signed_url(url, settings.supabase_verification_files_bucket, expires_in=300))
 
 
 @router.get("/{verification_id}/qualification-files/{qualification_id}")
@@ -264,10 +228,9 @@ def view_qualification_file(
     qualification = db.get(InstructorQualification, qualification_id)
     if not qualification or qualification.verification_id != verification.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Khong tim thay bang cap")
-    path = _file_path(qualification.degree_url)
-    if not path or not path.is_file():
+    if not qualification.degree_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Khong tim thay file bang cap")
-    return FileResponse(path, filename=path.name)
+    return RedirectResponse(create_signed_url(qualification.degree_url, settings.supabase_verification_files_bucket, expires_in=300))
 
 
 admin_router = APIRouter(prefix="/admin/instructor-verifications", tags=["Admin Instructor Verifications"])

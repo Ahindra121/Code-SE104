@@ -1,13 +1,11 @@
-import unicodedata
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.entities import Course, CourseStatus, Enrollment, EnrollmentStatus, LearningProgress, Lesson, User, UserRole
@@ -17,10 +15,10 @@ from app.schemas.progress import LessonProgressUpdate, ProgressOut
 from app.routers.progress import apply_progress_update, require_enrollment, sync_lesson_completion
 from app.services.course_service import assert_course_owner
 from app.services.settings_service import get_extensions_setting, get_int_setting
+from app.services.storage_service import create_signed_url, delete_storage_file, upload_file_to_storage
 
 router = APIRouter(prefix="/lessons", tags=["Lessons"])
 CONTENT_RESTORE_DAYS = 30
-UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "uploads"
 
 
 def _now() -> datetime:
@@ -63,68 +61,28 @@ def is_enrolled_in_course(db: Session, user: User, course_id: int) -> bool:
     )
 
 
-def _safe_filename(filename: str) -> str:
-    normalized = unicodedata.normalize("NFKD", Path(filename).name)
-    ascii_name = normalized.encode("ascii", "ignore").decode("ascii").replace(" ", "_")
-    return "".join(char for char in ascii_name if char.isalnum() or char in "._-") or "upload"
-
-
 def _delete_upload(url: str | None) -> None:
-    if not url or not url.startswith("/uploads/"):
-        return
-    path = (UPLOAD_ROOT.parent / url.lstrip("/")).resolve()
-    if UPLOAD_ROOT not in path.parents:
-        return
-    if path.is_file():
-        path.unlink(missing_ok=True)
+    delete_storage_file(url, settings.supabase_lesson_files_bucket)
 
 
 async def _save_upload(
     file: UploadFile,
-    destination_dir: Path,
+    folder: str,
     allowed_extensions: set[str],
     max_size: int,
     invalid_message: str,
     size_message: str,
 ) -> tuple[str, str, str]:
-    extension = Path(file.filename or "").suffix.lower()
-    if extension not in allowed_extensions:
-        allowed = ", ".join(sorted(item.lstrip(".") for item in allowed_extensions))
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{invalid_message}. Dinh dang cho phep: {allowed}")
-
-    destination_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = _safe_filename(file.filename or f"upload{extension}")
-    filename = f"{uuid4().hex}_{safe_name}"
-    destination = destination_dir / filename
-
-    size = 0
-    try:
-        with destination.open("wb") as output:
-            while chunk := await file.read(1024 * 1024):
-                size += len(chunk)
-                if size > max_size:
-                    output.close()
-                    destination.unlink(missing_ok=True)
-                    raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=size_message)
-                output.write(chunk)
-    except HTTPException:
-        raise
-    except OSError as exc:
-        destination.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload thất bại") from exc
-    finally:
-        await file.close()
-
-    return "/" + destination.relative_to(UPLOAD_ROOT.parent).as_posix(), safe_name, extension.lstrip(".")
-
-
-def _upload_path(url: str | None) -> Path | None:
-    if not url or not url.startswith("/uploads/"):
-        return None
-    path = (UPLOAD_ROOT.parent / url.lstrip("/")).resolve()
-    if UPLOAD_ROOT not in path.parents:
-        return None
-    return path
+    return await upload_file_to_storage(
+        file=file,
+        folder=folder,
+        allowed_extensions=allowed_extensions,
+        max_size=max_size,
+        invalid_message=invalid_message,
+        size_message=size_message,
+        bucket=settings.supabase_lesson_files_bucket,
+        public=True,
+    )
 
 
 def _get_lesson_for_student_progress(db: Session, lesson_id: int, current_user: User) -> Lesson:
@@ -284,7 +242,7 @@ async def upload_lesson_video(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
     assert_course_owner(lesson.course, current_user)
 
-    upload_dir = UPLOAD_ROOT / "courses" / f"course_{lesson.course_id}" / "lessons" / f"lesson_{lesson.id}" / "videos"
+    upload_dir = f"courses/course_{lesson.course_id}/lessons/lesson_{lesson.id}/videos"
     max_size_mb = get_int_setting(db, "max_video_size_mb")
     new_url, _, _ = await _save_upload(
         file,
@@ -313,7 +271,7 @@ async def upload_lesson_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
     assert_course_owner(lesson.course, current_user)
 
-    upload_dir = UPLOAD_ROOT / "courses" / f"course_{lesson.course_id}" / "lessons" / f"lesson_{lesson.id}" / "documents"
+    upload_dir = f"courses/course_{lesson.course_id}/lessons/lesson_{lesson.id}/documents"
     max_size_mb = get_int_setting(db, "max_document_size_mb")
     new_url, document_name, document_type = await _save_upload(
         file,
@@ -339,10 +297,9 @@ def download_lesson_document(lesson_id: int, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
     if not can_access_lesson(db, current_user, lesson):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Enrollment required")
-    path = _upload_path(lesson.document_url)
-    if not path or not path.is_file():
+    if not lesson.document_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-    return FileResponse(path, filename=lesson.document_name or path.name)
+    return RedirectResponse(create_signed_url(lesson.document_url, settings.supabase_lesson_files_bucket, expires_in=300))
 
 
 @router.get("/{lesson_id}/progress")
