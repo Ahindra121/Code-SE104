@@ -29,7 +29,6 @@ type FinalTest = {
   course_id: number
   title: string
   description?: string | null
-  passing_score_percent: number
   questions: FinalTestQuestion[]
 }
 
@@ -119,7 +118,7 @@ export default function FinalTestPage() {
   const attemptLimit = courseSettings ? (courseSettings.allow_final_test_retake ? courseSettings.max_final_test_attempts : 1) : null
   const attemptsUsed = submissions.length
   const attemptsRemaining = attemptLimit == null ? null : Math.max(0, attemptLimit - attemptsUsed)
-  const passScore = courseSettings?.final_test_pass_score ?? test?.passing_score_percent ?? 0
+  const passScore = courseSettings?.final_test_pass_score ?? 0
 
   async function handleSubmit() {
     if (!test || !allAnswered) return

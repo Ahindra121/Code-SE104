@@ -147,7 +147,6 @@ type FinalTest = {
   course_id: number
   title: string
   description?: string | null
-  passing_score_percent: number
   is_active: boolean
   questions: FinalTestQuestion[]
 }
@@ -155,7 +154,6 @@ type FinalTest = {
 type FinalTestForm = {
   title: string
   description: string
-  passing_score_percent: string
   is_active: boolean
 }
 
@@ -266,7 +264,6 @@ const emptyQuestionForm: QuestionForm = {
 const emptyFinalTestForm: FinalTestForm = {
   title: "Final Test cuối khóa",
   description: "",
-  passing_score_percent: "70",
   is_active: true,
 }
 
@@ -491,7 +488,6 @@ export default function CourseEditorPage() {
           setFinalTestForm({
             title: loadedFinalTest.title,
             description: loadedFinalTest.description ?? "",
-            passing_score_percent: String(loadedFinalTest.passing_score_percent),
             is_active: loadedFinalTest.is_active,
           })
           setFinalQuestionForm((prev) => ({
@@ -1049,7 +1045,6 @@ export default function CourseEditorPage() {
       const payload = {
         title: finalTestForm.title.trim(),
         description: finalTestForm.description.trim() || null,
-        passing_score_percent: Number(finalTestForm.passing_score_percent) || 70,
         is_active: finalTestForm.is_active,
       }
       if (!payload.title) {
@@ -1088,8 +1083,6 @@ export default function CourseEditorPage() {
         body: JSON.stringify(courseSettings),
       })
       setCourseSettings(result.data)
-      setFinalTestForm((prev) => ({ ...prev, passing_score_percent: String(result.data.final_test_pass_score) }))
-      setFinalTest((prev) => (prev ? { ...prev, passing_score_percent: result.data.final_test_pass_score } : prev))
       setMessage("Đã lưu cài đặt khóa học.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không lưu được cài đặt khóa học")
@@ -2010,13 +2003,7 @@ export default function CourseEditorPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Điểm đạt (%)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={finalTestForm.passing_score_percent}
-                    onChange={(e) => setFinalTestForm((prev) => ({ ...prev, passing_score_percent: e.target.value }))}
-                  />
+                  <Input value={`${courseSettings.final_test_pass_score}%`} readOnly className="bg-muted/50" />
                 </div>
                 <div className="space-y-2 lg:col-span-2">
                   <Label>Mô tả</Label>

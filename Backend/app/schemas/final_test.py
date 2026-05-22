@@ -68,9 +68,10 @@ class FinalTestQuestionForStudent(BaseModel):
 
 
 class FinalTestBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    passing_score_percent: float = Field(default=70, ge=0, le=100)
     is_active: bool = True
 
 
@@ -79,14 +80,15 @@ class FinalTestCreate(FinalTestBase):
 
 
 class FinalTestUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
-    passing_score_percent: float | None = Field(default=None, ge=0, le=100)
     is_active: bool | None = None
 
 
 class FinalTestOut(FinalTestBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: int
     course_id: int
@@ -96,7 +98,7 @@ class FinalTestOut(FinalTestBase):
 
 
 class FinalTestForStudent(FinalTestBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
     id: int
     course_id: int
