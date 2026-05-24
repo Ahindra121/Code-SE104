@@ -16,6 +16,7 @@ import {
   BarChart3,
   BookOpen,
   BadgeCheck,
+  User,
 } from "lucide-react"
 
 type AdminSectionKey = "dashboard" | "users" | "verifications" | "courses" | "reports" | "analytics" | "settings"
@@ -27,6 +28,7 @@ const sidebarItems = [
   { key: "courses", name: "Khóa học", icon: BookOpen, href: "/admin/courses" },
   { key: "reports", name: "Báo cáo", icon: FileText, href: "/admin/reports" },
   { key: "analytics", name: "Phân tích", icon: BarChart3, href: "/admin/analytics" },
+  { key: "profile", name: "Hồ sơ cá nhân", icon: User, href: "/profile" },
   { key: "settings", name: "Cài đặt", icon: Settings, href: "/admin/settings" },
 ] as const
 
@@ -132,4 +134,3 @@ export function AdminShell({
     </div>
   )
 }
-
