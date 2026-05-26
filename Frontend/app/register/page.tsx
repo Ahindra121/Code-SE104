@@ -154,23 +154,6 @@ export default function RegisterPage() {
           <h2 className="text-3xl font-bold text-foreground mb-4">
             Bắt đầu hành trình học tập
           </h2>
-          <p className="text-lg text-muted-foreground">
-            Tham gia cộng đồng hơn 100,000 học viên và giảng viên trên LearnHub để phát triển kỹ năng của bạn.
-          </p>
-          <div className="mt-8 flex justify-center gap-8">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">500+</div>
-              <div className="text-sm text-muted-foreground">Khóa học</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">100K+</div>
-              <div className="text-sm text-muted-foreground">Học viên</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">200+</div>
-              <div className="text-sm text-muted-foreground">Giảng viên</div>
-            </div>
-          </div>
         </div>
       </div>
 
