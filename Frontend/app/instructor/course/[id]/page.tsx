@@ -794,6 +794,30 @@ export default function CourseEditorPage() {
     }
   }
 
+  async function handleClearLessonVideo(lesson: Lesson) {
+    if (!lesson.video_url || !window.confirm("Xóa video khỏi bài học này?")) return
+
+    try {
+      setSavingLessonEdit(true)
+      setMessage(null)
+      setError(null)
+      const result = await apiFetch<Lesson>(`/lessons/${lesson.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ video_url: null }),
+      })
+      setLessons((prev) => prev.map((item) => (item.id === lesson.id ? result.data : item)))
+      if (editingLessonId === lesson.id) {
+        setLessonEditVideoFile(null)
+        setLessonEditForm((prev) => ({ ...prev, video_url: "" }))
+      }
+      setMessage("Đã xóa video khỏi bài học.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không xóa được video")
+    } finally {
+      setSavingLessonEdit(false)
+    }
+  }
+
   function startEditLesson(lesson: Lesson) {
     setEditingLessonId(lesson.id)
     setLessonEditVideoFile(null)
@@ -1574,7 +1598,21 @@ export default function CourseEditorPage() {
                               onChange={(e) => setLessonEditVideoFile(e.target.files?.[0] ?? null)}
                             />
                             <p className="text-xs text-muted-foreground">{uploadRuleText(uploadLimits, "max_video_size_mb", "allowed_video_extensions")}</p>
-                            {lesson.video_url && <p className="text-xs text-muted-foreground">Đã có video: {lesson.video_url}</p>}
+                            {lesson.video_url && (
+                              <div className="space-y-2">
+                                <p className="break-all text-xs text-muted-foreground">Đã có video: {lesson.video_url}</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => handleClearLessonVideo(lesson)}
+                                  disabled={savingLessonEdit || Boolean(uploadingLessonAsset)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Xóa video
+                                </Button>
+                              </div>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <Label>Upload tài liệu mới</Label>
@@ -1611,9 +1649,21 @@ export default function CourseEditorPage() {
                             <div className="mt-2 flex flex-wrap gap-2">
                               {lesson.document_name && <Badge variant="secondary">{lesson.document_name}</Badge>}
                               {lesson.video_url && (
-                                <Button size="sm" variant="outline" asChild>
-                                  <a href={assetUrl(lesson.video_url)} target="_blank" rel="noreferrer">Xem video</a>
-                                </Button>
+                                <>
+                                  <Button size="sm" variant="outline" asChild>
+                                    <a href={assetUrl(lesson.video_url)} target="_blank" rel="noreferrer">Xem video</a>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleClearLessonVideo(lesson)}
+                                    disabled={savingLessonEdit || Boolean(uploadingLessonAsset)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Xóa video
+                                  </Button>
+                                </>
                               )}
                               {lesson.document_url && (
                                 <>

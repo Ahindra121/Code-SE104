@@ -223,8 +223,18 @@ def update_lesson(
     if not lesson or lesson.is_deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
     assert_course_owner(lesson.course, current_user)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    old_video_url = lesson.video_url
+    old_document_url = lesson.document_url
+    for field, value in updates.items():
         setattr(lesson, field, value)
+    if "video_url" in updates and updates["video_url"] != old_video_url:
+        _delete_upload(old_video_url)
+    if "document_url" in updates and updates["document_url"] != old_document_url:
+        _delete_upload(old_document_url)
+        if not updates["document_url"]:
+            lesson.document_name = None
+            lesson.document_type = None
     db.commit()
     db.refresh(lesson)
     return ok(LessonOut.model_validate(lesson), "Lesson updated")
