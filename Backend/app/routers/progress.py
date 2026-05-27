@@ -98,6 +98,7 @@ def apply_progress_update(
     progress_percent: float,
 ) -> None:
     progress.duration_seconds = max(progress.duration_seconds or 0, duration_seconds, lesson.duration_seconds or 0)
+    previous_max_watched = progress.max_watched_seconds or 0
 
     if progress.duration_seconds:
         safe_watched_seconds = min(watched_seconds, progress.duration_seconds)
@@ -106,7 +107,14 @@ def apply_progress_update(
         safe_watched_seconds = watched_seconds
         requested_max_watched = max(max_watched_seconds, safe_watched_seconds)
 
-    progress.max_watched_seconds = max(progress.max_watched_seconds or 0, requested_max_watched)
+    if lesson.video_url and not progress.is_completed:
+        last_updated = progress.updated_at
+        if last_updated and last_updated.tzinfo is None:
+            last_updated = last_updated.replace(tzinfo=UTC)
+        elapsed_seconds = 0 if not last_updated else max(0, int((datetime.now(UTC) - last_updated).total_seconds()))
+        requested_max_watched = min(requested_max_watched, previous_max_watched + elapsed_seconds + 5)
+
+    progress.max_watched_seconds = max(previous_max_watched, requested_max_watched)
     progress.watched_seconds = min(safe_watched_seconds, progress.max_watched_seconds)
     calculated_percent = (
         0

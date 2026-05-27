@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, CheckCircle2, Download, FileText, PlayCircle } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Download, FileText, Pause, Play, PlayCircle, Volume2, VolumeX } from "lucide-react"
 
 type Lesson = {
   id: number
@@ -96,11 +96,16 @@ export default function LessonPage() {
   const [submittingQuiz, setSubmittingQuiz] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [videoDuration, setVideoDuration] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const maxWatchedRef = useRef(0)
   const restoredVideoRef = useRef(false)
   const correctingSeekRef = useRef(false)
   const seekingRef = useRef(false)
+  const blockedSeekTargetRef = useRef<number | null>(null)
   const lastSentPercentRef = useRef(0)
   const lastSentAtRef = useRef(0)
 
@@ -119,6 +124,10 @@ export default function LessonPage() {
       try {
         setLoading(true)
         setError(null)
+        setCurrentTime(0)
+        setVideoDuration(0)
+        setIsPlaying(false)
+        setIsMuted(false)
         restoredVideoRef.current = false
         maxWatchedRef.current = 0
 
@@ -222,16 +231,50 @@ export default function LessonPage() {
   function handleVideoLoaded(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget
     videoRef.current = video
+    setVideoDuration(Number.isFinite(video.duration) ? video.duration : 0)
+    setIsMuted(video.muted)
     maxWatchedRef.current = Math.max(maxWatchedRef.current, lessonProgress?.max_watched_seconds ?? 0, lessonProgress?.watched_seconds ?? 0)
     if (!restoredVideoRef.current && lessonProgress?.watched_seconds && lessonProgress.watched_seconds < video.duration) {
       restoredVideoRef.current = true
       video.currentTime = lessonProgress.watched_seconds
     }
+    setCurrentTime(video.currentTime)
+  }
+
+  function getAllowedSeekTime(video: HTMLVideoElement) {
+    const duration = Number.isFinite(video.duration) ? video.duration : maxWatchedRef.current
+    return Math.min(duration, maxWatchedRef.current)
+  }
+
+  function enforceAllowedPlaybackPosition(video: HTMLVideoElement) {
+    const allowedTime = getAllowedSeekTime(video)
+    blockedSeekTargetRef.current = allowedTime
+    correctingSeekRef.current = true
+    video.currentTime = allowedTime
+
+    requestAnimationFrame(() => {
+      if (videoRef.current !== video || blockedSeekTargetRef.current === null) return
+      if (video.currentTime > blockedSeekTargetRef.current + 0.25) {
+        video.currentTime = blockedSeekTargetRef.current
+      }
+    })
   }
 
   function handleVideoTimeUpdate(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget
-    if (video.seeking || seekingRef.current || correctingSeekRef.current) {
+    setVideoDuration(Number.isFinite(video.duration) ? video.duration : 0)
+    if (correctingSeekRef.current && blockedSeekTargetRef.current !== null) {
+      if (video.currentTime > blockedSeekTargetRef.current + 0.25) {
+        enforceAllowedPlaybackPosition(video)
+        return
+      }
+      correctingSeekRef.current = false
+      blockedSeekTargetRef.current = null
+    }
+
+    setCurrentTime(video.currentTime)
+
+    if (video.seeking || seekingRef.current) {
       return
     }
 
@@ -242,27 +285,108 @@ export default function LessonPage() {
   function handleVideoSeeking(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget
     seekingRef.current = true
-    const allowedTime = maxWatchedRef.current
-    if (video.currentTime > allowedTime) {
-      correctingSeekRef.current = true
-      video.currentTime = maxWatchedRef.current
+    const allowedTime = getAllowedSeekTime(video)
+    if (video.currentTime > allowedTime + 0.25) {
+      enforceAllowedPlaybackPosition(video)
+      setCurrentTime(allowedTime)
+      return
     }
+    setCurrentTime(video.currentTime)
   }
 
-  function handleVideoSeeked() {
+  function handleVideoSeeked(event: React.SyntheticEvent<HTMLVideoElement>) {
+    const video = event.currentTarget
+    if (blockedSeekTargetRef.current !== null && video.currentTime > blockedSeekTargetRef.current + 0.25) {
+      enforceAllowedPlaybackPosition(video)
+      return
+    }
+
     seekingRef.current = false
     correctingSeekRef.current = false
+    blockedSeekTargetRef.current = null
+    setCurrentTime(video.currentTime)
   }
 
   function handleVideoPause(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget
-    void saveVideoProgress(video.currentTime, video.duration, true)
+    setIsPlaying(false)
+    const safeTime = Math.min(video.currentTime, getAllowedSeekTime(video))
+    void saveVideoProgress(safeTime, video.duration, true)
   }
 
   function handleVideoEnded(event: React.SyntheticEvent<HTMLVideoElement>) {
     const video = event.currentTarget
+    setIsPlaying(false)
+    setCurrentTime(video.duration)
     maxWatchedRef.current = video.duration
     void saveVideoProgress(video.duration, video.duration, true)
+  }
+
+  function handleVideoPlay() {
+    setIsPlaying(true)
+  }
+
+  function togglePlayback() {
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.paused) {
+      void video.play()
+      return
+    }
+
+    video.pause()
+  }
+
+  function toggleMute() {
+    const video = videoRef.current
+    if (!video) return
+
+    video.muted = !video.muted
+    setIsMuted(video.muted)
+  }
+
+  function seekTo(targetTime: number) {
+    const video = videoRef.current
+    if (!video) return
+
+    const allowedTime = getAllowedSeekTime(video)
+    const nextTime = Math.max(0, Math.min(targetTime, allowedTime))
+    correctingSeekRef.current = false
+    blockedSeekTargetRef.current = null
+    seekingRef.current = false
+    video.currentTime = nextTime
+    setCurrentTime(nextTime)
+  }
+
+  function handleTimelineClick(event: React.MouseEvent<HTMLDivElement>) {
+    const video = videoRef.current
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    if (rect.width <= 0) return
+
+    const clickRatio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+    const targetTime = clickRatio * video.duration
+    const allowedTime = getAllowedSeekTime(video)
+    if (targetTime > allowedTime + 0.25) return
+
+    seekTo(targetTime)
+  }
+
+  function formatTime(seconds: number) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "00:00"
+
+    const totalSeconds = Math.floor(seconds)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const remainingSeconds = totalSeconds % 60
+
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
+    }
+
+    return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
   }
 
   function handleViewContent() {
@@ -356,7 +480,8 @@ export default function LessonPage() {
     function handleBeforeUnload() {
       const video = videoRef.current
       if (video && Number.isFinite(video.duration)) {
-        void saveVideoProgress(video.currentTime, video.duration, true)
+        const safeTime = Math.min(video.currentTime, getAllowedSeekTime(video))
+        void saveVideoProgress(safeTime, video.duration, true)
       }
     }
 
@@ -402,6 +527,10 @@ export default function LessonPage() {
   const latestQuizAttempt = attempt ?? quizAttempts[0] ?? null
   const hasPassedQuiz = quizAttempts.some((item) => item.passed) || Boolean(attempt?.passed)
   const quizAttemptsRemaining = quizAttemptLimit == null ? null : Math.max(0, quizAttemptLimit - quizAttemptsUsed)
+  const resolvedDuration = videoDuration || lesson.duration_seconds || lessonProgress?.duration_seconds || 0
+  const unlockedTime = Math.min(resolvedDuration, maxWatchedRef.current)
+  const playedRatio = resolvedDuration > 0 ? Math.min(currentTime, resolvedDuration) / resolvedDuration : 0
+  const unlockedRatio = resolvedDuration > 0 ? unlockedTime / resolvedDuration : 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -421,19 +550,74 @@ export default function LessonPage() {
         <div className="space-y-6">
           <Card>
             {videoSrc ? (
-              <video
-                controls
-                ref={videoRef}
-                className="aspect-video w-full rounded-t-lg bg-black"
-                onLoadedMetadata={handleVideoLoaded}
-                onTimeUpdate={handleVideoTimeUpdate}
-                onSeeking={handleVideoSeeking}
-                onSeeked={handleVideoSeeked}
-                onPause={handleVideoPause}
-                onEnded={handleVideoEnded}
-              >
-                <source src={videoSrc} type="video/mp4" />
-              </video>
+              <div className="overflow-hidden rounded-t-lg bg-black">
+                <video
+                  ref={videoRef}
+                  className="aspect-video w-full bg-black"
+                  onClick={togglePlayback}
+                  onLoadedMetadata={handleVideoLoaded}
+                  onTimeUpdate={handleVideoTimeUpdate}
+                  onSeeking={handleVideoSeeking}
+                  onSeeked={handleVideoSeeked}
+                  onPlay={handleVideoPlay}
+                  onPause={handleVideoPause}
+                  onEnded={handleVideoEnded}
+                >
+                  <source src={videoSrc} type="video/mp4" />
+                </video>
+                <div className="space-y-3 bg-zinc-950 px-4 py-3 text-white">
+                  <div
+                    className="group relative h-2 w-full cursor-pointer rounded-full bg-white/10"
+                    onClick={handleTimelineClick}
+                    role="presentation"
+                  >
+                    <div className="absolute inset-y-0 left-0 rounded-full bg-white/20" style={{ width: `${unlockedRatio * 100}%` }} />
+                    <div className="absolute inset-y-0 left-0 rounded-full bg-emerald-500" style={{ width: `${playedRatio * 100}%` }} />
+                    {resolvedDuration > 0 && (
+                      <div
+                        className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-emerald-400 shadow-sm transition-transform group-hover:scale-110"
+                        style={{ left: `${playedRatio * 100}%` }}
+                      />
+                    )}
+                    {unlockedRatio < 1 && (
+                      <div
+                        className="absolute inset-y-0 rounded-r-full bg-white/5"
+                        style={{
+                          left: `${unlockedRatio * 100}%`,
+                          width: `${(1 - unlockedRatio) * 100}%`,
+                          cursor: "not-allowed",
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-xs text-white/70">
+                    <span>{formatTime(currentTime)} / {formatTime(resolvedDuration)}</span>
+                    <span>Chỉ tua trong phần đã xem</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      aria-label={isPlaying ? "Tạm dừng video" : "Phát video"}
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                      onClick={togglePlayback}
+                    >
+                      {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      aria-label={isMuted ? "Bật âm thanh" : "Tắt âm thanh"}
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                      onClick={toggleMute}
+                    >
+                      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="flex aspect-video items-center justify-center bg-muted">
                 <div className="text-center">
