@@ -160,7 +160,7 @@ export default function StudentDashboard() {
           apiFetch<{ items: BackendCourse[]; total: number; page: number; page_size: number }>("/courses?page_size=3"),
         ])
 
-        setEnrollments(enrollmentsRes.data.filter((enrollment) => enrollment.status === "active"))
+        setEnrollments(enrollmentsRes.data.filter((enrollment) => ["active", "completed"].includes(enrollment.status)))
         setReport(reportRes.data)
         setRecommended(coursesRes.data.items)
       } catch (err) {
