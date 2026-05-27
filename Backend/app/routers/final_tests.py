@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from math import isfinite
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -448,6 +449,8 @@ def grade_final_test_submission(
         for question in submission.final_test.questions
         if question.question_type == FinalTestQuestionType.essay
     )
+    if not isfinite(payload.manual_score):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Manual score must be a finite number")
     if payload.manual_score > essay_max_score:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Manual score exceeds essay max score")
 

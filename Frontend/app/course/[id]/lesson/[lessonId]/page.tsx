@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, CheckCircle2, Download, FileText, Maximize, Pause, Play, PlayCircle, Volume2, VolumeX } from "lucide-react"
+import { ArrowLeft, CheckCircle2, ChevronRight, Download, FileText, Maximize, Pause, Play, PlayCircle, Volume2, VolumeX } from "lucide-react"
 
 type Lesson = {
   id: number
@@ -85,6 +85,7 @@ export default function LessonPage() {
 
   const [course, setCourse] = useState<Course | null>(null)
   const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [lessons, setLessons] = useState<Lesson[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [viewerRole, setViewerRole] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<number, "A" | "B" | "C" | "D">>({})
@@ -124,6 +125,8 @@ export default function LessonPage() {
       try {
         setLoading(true)
         setError(null)
+        setAnswers({})
+        setAttempt(null)
         setCurrentTime(0)
         setVideoDuration(0)
         setIsPlaying(false)
@@ -140,7 +143,8 @@ export default function LessonPage() {
         setCourse(courseRes.data)
         setLesson(lessonRes.data)
 
-        const [questionsRes, progressRes, settingsRes, attemptsRes] = await Promise.allSettled([
+        const [lessonsRes, questionsRes, progressRes, settingsRes, attemptsRes] = await Promise.allSettled([
+          apiFetch<Lesson[]>(`/lessons/course/${courseId}`),
           apiFetch<Question[]>(`/questions/lesson/${lessonId}`),
           currentUser.role === "student" ? apiFetch<ProgressOut>(`/lessons/${lessonId}/progress`) : Promise.resolve(null),
           currentUser.role === "student" ? apiFetch<CourseSettings>(`/courses/${courseId}/settings`) : Promise.resolve(null),
@@ -148,6 +152,11 @@ export default function LessonPage() {
         ])
 
         if (!alive) return
+        if (lessonsRes.status === "fulfilled") {
+          setLessons(lessonsRes.value.data)
+        } else {
+          setLessons([])
+        }
         if (questionsRes.status === "fulfilled") {
           setQuestions(
             questionsRes.value.data.map((question) => ({
@@ -404,6 +413,15 @@ export default function LessonPage() {
     return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
   }
 
+  async function handleGoToNextLesson(nextLessonId: number) {
+    const video = videoRef.current
+    if (video && Number.isFinite(video.duration)) {
+      const safeTime = Math.min(video.currentTime, getAllowedSeekTime(video))
+      await saveVideoProgress(safeTime, video.duration, true)
+    }
+    router.push(`/course/${courseId}/lesson/${nextLessonId}`)
+  }
+
   function handleViewContent() {
     if (!lesson?.document_url) return
     window.open(assetUrl(lesson.document_url), "_blank", "noopener,noreferrer")
@@ -546,6 +564,8 @@ export default function LessonPage() {
   const unlockedTime = Math.min(resolvedDuration, maxWatchedRef.current)
   const playedRatio = resolvedDuration > 0 ? Math.min(currentTime, resolvedDuration) / resolvedDuration : 0
   const unlockedRatio = resolvedDuration > 0 ? unlockedTime / resolvedDuration : 0
+  const orderedLessons = [...lessons].sort((a, b) => a.order_index - b.order_index)
+  const nextLesson = orderedLessons.find((item) => item.order_index > lesson.order_index)
 
   return (
     <div className="min-h-screen bg-background">
@@ -695,6 +715,12 @@ export default function LessonPage() {
                   <Button onClick={handleMarkDocumentComplete}>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Đánh dấu đã hoàn thành
+                  </Button>
+                )}
+                {nextLesson && (
+                  <Button onClick={() => void handleGoToNextLesson(nextLesson.id)} className="sm:ml-auto">
+                    Bài tiếp theo
+                    <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
                 {!hasLearningContent && (

@@ -1249,7 +1249,34 @@ export default function CourseEditorPage() {
     }
   }
 
+  function getEssayMaxScore(submission: FinalTestSubmission) {
+    return submission.questions
+      .filter((question) => question.question_type === "essay")
+      .reduce((total, question) => total + Number(question.max_score || 0), 0)
+  }
+
+  function handleManualScoreChange(submission: FinalTestSubmission, value: string) {
+    if (value === "") {
+      setManualScores((prev) => ({ ...prev, [submission.id]: value }))
+      return
+    }
+
+    const essayMaxScore = getEssayMaxScore(submission)
+    const numericValue = Number(value)
+    if (!Number.isFinite(numericValue)) return
+
+    const nextScore = Math.min(Math.max(numericValue, 0), essayMaxScore)
+    setManualScores((prev) => ({ ...prev, [submission.id]: String(nextScore) }))
+  }
+
   async function handleGradeSubmission(submission: FinalTestSubmission) {
+    const essayMaxScore = getEssayMaxScore(submission)
+    const manualScore = Number(manualScores[submission.id] || 0)
+    if (!Number.isFinite(manualScore) || manualScore < 0 || manualScore > essayMaxScore) {
+      setError(`Điểm tự luận phải nằm trong khoảng 0 đến ${essayMaxScore}.`)
+      return
+    }
+
     try {
       setGradingSubmissionId(submission.id)
       setMessage(null)
@@ -1257,7 +1284,7 @@ export default function CourseEditorPage() {
       const result = await apiFetch<FinalTestSubmission>(`/instructor/final-test-submissions/${submission.id}/grade`, {
         method: "PATCH",
         body: JSON.stringify({
-          manual_score: Number(manualScores[submission.id]) || 0,
+          manual_score: manualScore,
           instructor_feedback: feedbacks[submission.id]?.trim() || null,
         }),
       })
@@ -2266,7 +2293,9 @@ export default function CourseEditorPage() {
                 {finalSubmissions.length === 0 ? (
                   <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">Không có bài nào đang chờ chấm.</p>
                 ) : (
-                  finalSubmissions.map((submission) => (
+                  finalSubmissions.map((submission) => {
+                    const essayMaxScore = getEssayMaxScore(submission)
+                    return (
                     <div key={submission.id} className="rounded-lg border border-border p-4">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
@@ -2285,7 +2314,10 @@ export default function CourseEditorPage() {
                             const question = submission.questions.find((item) => item.id === answer.question_id)
                             return (
                               <div key={answer.question_id} className="rounded-md bg-muted/40 p-3">
-                                <p className="font-medium">{question?.question_text || `Câu hỏi #${answer.question_id}`}</p>
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                  <p className="font-medium">{question?.question_text || `Câu hỏi #${answer.question_id}`}</p>
+                                  {question && <Badge variant="outline">Tối đa {question.max_score} điểm</Badge>}
+                                </div>
                                 <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{answer.answer}</p>
                               </div>
                             )
@@ -2298,9 +2330,12 @@ export default function CourseEditorPage() {
                           <Input
                             type="number"
                             min="0"
+                            max={essayMaxScore}
+                            step="0.1"
                             value={manualScores[submission.id] ?? ""}
-                            onChange={(e) => setManualScores((prev) => ({ ...prev, [submission.id]: e.target.value }))}
+                            onChange={(e) => handleManualScoreChange(submission, e.target.value)}
                           />
+                          <p className="text-xs text-muted-foreground">Tối đa {essayMaxScore} điểm</p>
                         </div>
                         <div className="space-y-2">
                           <Label>Feedback</Label>
@@ -2317,7 +2352,8 @@ export default function CourseEditorPage() {
                         </div>
                       </div>
                     </div>
-                  ))
+                    )
+                  })
                 )}
               </CardContent>
             </Card>
