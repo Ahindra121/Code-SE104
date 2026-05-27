@@ -672,8 +672,18 @@ export default function LessonPage() {
               </div>
             )}
             <CardContent className="p-6">
-              <h1 className="text-3xl font-bold text-foreground">{lesson.title}</h1>
-              <p className="mt-2 text-muted-foreground">{course?.title}</p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-foreground">{lesson.title}</h1>
+                  <p className="mt-2 text-muted-foreground">{course?.title}</p>
+                </div>
+                {nextLesson && (
+                  <Button onClick={() => void handleGoToNextLesson(nextLesson.id)} className="shrink-0">
+                    Bài tiếp theo
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Badge variant={isCompleted ? "default" : "secondary"} className={isCompleted ? "bg-green-600" : ""}>
                   {isCompleted && <CheckCircle2 className="mr-1 h-3.5 w-3.5" />}
@@ -715,12 +725,6 @@ export default function LessonPage() {
                   <Button onClick={handleMarkDocumentComplete}>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Đánh dấu đã hoàn thành
-                  </Button>
-                )}
-                {nextLesson && (
-                  <Button onClick={() => void handleGoToNextLesson(nextLesson.id)} className="sm:ml-auto">
-                    Bài tiếp theo
-                    <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
                 {!hasLearningContent && (
