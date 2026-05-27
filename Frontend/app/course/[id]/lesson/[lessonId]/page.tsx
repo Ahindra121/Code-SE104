@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, CheckCircle2, Download, FileText, Pause, Play, PlayCircle, Volume2, VolumeX } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Download, FileText, Maximize, Pause, Play, PlayCircle, Volume2, VolumeX } from "lucide-react"
 
 type Lesson = {
   id: number
@@ -346,6 +346,21 @@ export default function LessonPage() {
     setIsMuted(video.muted)
   }
 
+  function toggleFullscreen() {
+    const video = videoRef.current
+    if (!video) return
+
+    const player = video.parentElement
+    if (!player) return
+
+    if (document.fullscreenElement) {
+      void document.exitFullscreen()
+      return
+    }
+
+    void player.requestFullscreen()
+  }
+
   function seekTo(targetTime: number) {
     const video = videoRef.current
     if (!video) return
@@ -614,6 +629,16 @@ export default function LessonPage() {
                       onClick={toggleMute}
                     >
                       {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      aria-label="Phóng to video"
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="ml-auto border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                      onClick={toggleFullscreen}
+                    >
+                      <Maximize className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
