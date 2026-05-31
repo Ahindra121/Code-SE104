@@ -398,8 +398,8 @@ export default function HomePage() {
             <span className="text-xl font-bold">LearnHub</span>
           </Link>
           <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-foreground">Chính sách bảo mật</Link>
-            <Link href="/terms" className="hover:text-foreground">Điều khoản dịch vụ</Link>
+            <Link href="/privacy" target="_blank" rel="noreferrer" className="hover:text-foreground">Chính sách bảo mật</Link>
+            <Link href="/terms" target="_blank" rel="noreferrer" className="hover:text-foreground">Điều khoản dịch vụ</Link>
           </div>
           <p>&copy; {new Date().getFullYear()} LearnHub.</p>
         </div>

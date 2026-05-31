@@ -424,11 +424,11 @@ export default function RegisterPage() {
                         className="text-sm text-muted-foreground cursor-pointer leading-relaxed"
                       >
                         Tôi đồng ý với{" "}
-                        <Link href="/terms" className="text-primary hover:underline">
+                        <Link href="/terms" target="_blank" rel="noreferrer" className="text-primary hover:underline">
                           Điều khoản sử dụng
                         </Link>{" "}
                         và{" "}
-                        <Link href="/privacy" className="text-primary hover:underline">
+                        <Link href="/privacy" target="_blank" rel="noreferrer" className="text-primary hover:underline">
                           Chính sách bảo mật
                         </Link>
                       </Label>
