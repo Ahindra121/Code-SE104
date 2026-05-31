@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -22,6 +23,22 @@ def _deletion_retention_expired(user: User) -> bool:
         return False
     deleted_at = user.deleted_at.replace(tzinfo=UTC) if user.deleted_at.tzinfo is None else user.deleted_at
     return deleted_at <= datetime.now(UTC) - timedelta(days=SOFT_DELETE_RETENTION_DAYS)
+
+
+def _authenticate_user(db: Session, username: str, password: str) -> User:
+    user = db.scalar(select(User).where(or_(User.username == username, User.email == username)))
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="TÃªn tÃ i khoáº£n/email hoáº·c máº­t kháº©u khÃ´ng Ä‘Ãºng")
+    if not user.is_active:
+        if user.admin_locked_at:
+            details = ["TÃ i khoáº£n Ä‘Ã£ bá»‹ admin vÃ´ hiá»‡u hÃ³a vÃ  cáº§n Ä‘Æ°á»£c duyá»‡t Ä‘á»ƒ má»Ÿ láº¡i"]
+            if user.admin_locked_reason:
+                details.append(f"LÃ½ do vÃ´ hiá»‡u hÃ³a: {user.admin_locked_reason}")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=". ".join(details))
+        if user.deleted_at:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="TÃ i khoáº£n Ä‘ang chá» xÃ³a vÃ  cÃ³ thá»ƒ má»Ÿ láº¡i")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="TÃ i khoáº£n Ä‘Ã£ bá»‹ vÃ´ hiá»‡u hÃ³a vÃ  cÃ³ thá»ƒ má»Ÿ láº¡i")
+    return user
 
 
 @router.post("/register")
@@ -75,6 +92,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản đã bị vô hiệu hóa và có thể mở lại")
     token = create_access_token(str(user.id))
     return ok(TokenResponse(access_token=token, user=UserOut.model_validate(user)), "Đăng nhập thành công")
+
+
+@router.post("/token", include_in_schema=False)
+def swagger_token(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = _authenticate_user(db, form.username, form.password)
+    token = create_access_token(str(user.id))
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/reactivate")
