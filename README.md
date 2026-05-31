@@ -1,32 +1,34 @@
-# LearnHub
+# LearnHub - Hệ Thống Học Trực Tuyến
 
-LearnHub la ung dung hoc truc tuyen gom frontend Next.js va backend FastAPI. Repo nay duoc chuan hoa de nhom co the clone ve chay local, day code len GitHub va deploy theo mo hinh:
+LearnHub là đồ án website học trực tuyến gồm:
 
-- Frontend: Vercel
-- Backend: Render hoac Railway
-- Database: Supabase PostgreSQL
-- Storage: Supabase Storage, neu can upload file ben vung
-- Source code: GitHub
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
+- **Backend:** FastAPI, SQLAlchemy, Alembic
+- **Database:** PostgreSQL
+- **Storage upload file:** Supabase Storage
 
-## Cong nghe
+Tài liệu này hướng dẫn giảng viên hoặc thành viên nhóm pull source code về và chạy được dự án trên máy local.
 
-Frontend:
+## 1. Yêu Cầu Môi Trường
 
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- shadcn/ui style components
+Cần cài sẵn:
 
-Backend:
+- Git
+- Python 3.11 trở lên
+- Node.js 20 trở lên
+- PostgreSQL local hoặc Supabase PostgreSQL
+- Tài khoản Supabase nếu muốn test chức năng upload ảnh/video/tài liệu/minh chứng giảng viên
 
-- FastAPI
-- SQLAlchemy
-- Alembic
-- PostgreSQL
-- JWT authentication
+Kiểm tra phiên bản:
 
-## Cau truc thu muc
+```powershell
+python --version
+node --version
+npm --version
+git --version
+```
+
+## 2. Cấu Trúc Thư Mục
 
 ```text
 .
@@ -49,230 +51,378 @@ Backend:
 |   |-- public/
 |   |-- .env.example
 |   `-- package.json
-|-- .gitignore
-`-- README.md
+|-- README.md
+`-- .gitignore
 ```
 
-## Chuan bi moi truong
+## 3. Clone Hoặc Pull Source Code
 
-Can cai san:
+Nếu chưa có source:
 
-- Python 3.11+
-- Node.js 20+
-- PostgreSQL local hoac Supabase PostgreSQL
-- Git
+```powershell
+git clone <link-repository>
+cd "Code SE104"
+```
 
-Khong commit cac file sau len GitHub:
+Nếu đã có source:
 
-- `.env`, `.env.local`
-- `.venv/`
-- `node_modules/`
-- `.next/`
-- `__pycache__/`
-- `Backend/uploads/`
-- file log, cache, report sinh ra khi chay app
+```powershell
+git pull
+```
 
-## Chay backend local
+## 4. Cấu Hình Và Chạy Backend
+
+Di chuyển vào thư mục Backend:
 
 ```powershell
 cd Backend
+```
+
+Tạo môi trường ảo Python:
+
+```powershell
 python -m venv .venv
+```
+
+Kích hoạt môi trường ảo trên Windows PowerShell:
+
+```powershell
 .\.venv\Scripts\Activate.ps1
+```
+
+Nếu PowerShell chặn chạy script, dùng lệnh sau rồi kích hoạt lại:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Cài thư viện Backend:
+
+```powershell
 pip install -r requirements.txt
+```
+
+Tạo file môi trường:
+
+```powershell
 copy .env.example .env
 ```
 
-Sua file `Backend/.env`:
+Mở file `Backend/.env` và chỉnh các biến sau.
 
-```env
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/learnhub
-SECRET_KEY=change-this-secret-key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
-```
+### Trường Hợp Dùng PostgreSQL Local
 
-Tao database local neu chua co:
+Tạo database tên `learnhub` bằng pgAdmin hoặc psql:
 
 ```sql
 CREATE DATABASE learnhub;
 ```
 
-Chay migration:
+Cấu hình `Backend/.env`:
+
+```env
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/learnhub
+SECRET_KEY=change-this-secret-key-before-deploy
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_COURSE_ASSETS_BUCKET=course-assets
+SUPABASE_LESSON_FILES_BUCKET=lesson-files
+SUPABASE_VERIFICATION_FILES_BUCKET=verification-files
+```
+
+Lưu ý:
+
+- Nếu chỉ xem giao diện và dữ liệu mẫu, có thể tạm để nguyên các biến Supabase.
+- Nếu test upload thumbnail, video, tài liệu hoặc minh chứng giảng viên thì phải cấu hình Supabase thật.
+
+### Trường Hợp Dùng Supabase PostgreSQL
+
+Lấy connection string trong Supabase ở phần **Project Settings > Database**.
+
+Ví dụ:
+
+```env
+DATABASE_URL=postgresql+psycopg2://postgres.your-project-ref:your-password@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
+```
+
+Nếu mật khẩu database có ký tự đặc biệt, cần URL encode mật khẩu trước khi đưa vào `DATABASE_URL`.
+
+### Chạy Migration
+
+Trong thư mục `Backend`, chạy:
 
 ```powershell
 alembic upgrade head
 ```
 
-Tao du lieu mau:
+### Tạo Dữ Liệu Mẫu
 
 ```powershell
 python -m app.seed
 ```
 
-Chay backend:
+Sau khi seed, có các tài khoản demo sau. Tất cả dùng mật khẩu:
+
+```text
+Demo@123
+```
+
+| Vai trò | Username | Email |
+| --- | --- | --- |
+| Admin | `admin123` | `admin@example.com` |
+| Giảng viên | `instructor123` | `instructor@example.com` |
+| Học viên | `student123` | `student@example.com` |
+
+### Chạy Backend
 
 ```powershell
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Kiem tra:
+Kiểm tra Backend:
 
 - API root: `http://127.0.0.1:8000/`
 - Swagger docs: `http://127.0.0.1:8000/docs`
 
-Tai khoan demo sau khi seed deu dung mat khau `Demo@123`:
+Backend API có prefix `/api`, ví dụ:
 
-- `admin123`
-- `instructor123`
-- `student123`
+```text
+http://127.0.0.1:8000/api/auth/login
+```
 
-## Chay frontend local
+## 5. Cấu Hình Và Chạy Frontend
+
+Mở terminal mới, từ thư mục gốc dự án di chuyển vào Frontend:
 
 ```powershell
 cd Frontend
-npm install
-copy .env.example .env.local
-npm run dev
 ```
 
-File `Frontend/.env.local` can tro den backend:
+Cài thư viện:
+
+```powershell
+npm install
+```
+
+Tạo file môi trường:
+
+```powershell
+copy .env.example .env.local
+```
+
+Kiểm tra file `Frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
 ```
 
-Mo frontend tai:
+Chạy Frontend:
+
+```powershell
+npm run dev
+```
+
+Mở trình duyệt:
 
 ```text
 http://localhost:3000
 ```
 
-## Bien moi truong
+## 6. Thứ Tự Chạy Khi Demo
 
-Backend:
+Nên chạy theo thứ tự:
 
-| Bien | Y nghia |
-| --- | --- |
-| `DATABASE_URL` | Connection string PostgreSQL dung cho SQLAlchemy |
-| `SECRET_KEY` | Khoa ky JWT, can thay bang chuoi dai va bi mat khi deploy |
-| `ALGORITHM` | Thuat toan JWT, mac dinh `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Thoi gian het han access token |
-| `CORS_ORIGINS` | Danh sach domain frontend duoc phep goi API |
+1. Mở terminal 1, chạy Backend:
 
-Frontend:
-
-| Bien | Y nghia |
-| --- | --- |
-| `NEXT_PUBLIC_API_URL` | Base URL cua backend API, vi du `https://your-api.onrender.com/api` |
-
-## Deploy database tren Supabase
-
-1. Tao project tren Supabase.
-2. Vao Project Settings > Database de lay connection string.
-3. Dung URI dang PostgreSQL va them driver `postgresql+psycopg2://` cho backend.
-4. Dat `DATABASE_URL` nay vao Render/Railway.
-5. Chay migration production:
-
-```bash
-alembic upgrade head
+```powershell
+cd Backend
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Luu y: khong dua mat khau Supabase vao GitHub. Chi dat trong Environment Variables cua dich vu deploy.
+2. Mở terminal 2, chạy Frontend:
 
-## Deploy backend tren Render
+```powershell
+cd Frontend
+npm run dev
+```
 
-Tao Web Service moi tu GitHub repo:
+3. Truy cập:
 
-- Root Directory: `Backend`
-- Runtime: Python
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+```text
+http://localhost:3000
+```
 
-Environment Variables:
+4. Đăng nhập bằng tài khoản demo, ví dụ:
+
+```text
+Username: admin123
+Password: Demo@123
+```
+
+## 7. Cấu Hình Supabase Storage Cho Upload File
+
+Dự án hiện tại dùng Supabase Storage cho các chức năng:
+
+- Upload thumbnail khóa học
+- Upload video bài học
+- Upload tài liệu bài học
+- Upload minh chứng xác minh giảng viên
+
+Trong Supabase, tạo 3 bucket:
+
+| Bucket | Mục đích |
+| --- | --- |
+| `course-assets` | Lưu ảnh thumbnail khóa học |
+| `lesson-files` | Lưu video và tài liệu bài học |
+| `verification-files` | Lưu file xác minh giảng viên |
+
+Sau đó cấu hình trong `Backend/.env`:
 
 ```env
-DATABASE_URL=postgresql+psycopg2://...
-SECRET_KEY=your-production-secret
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-CORS_ORIGINS=["https://your-frontend.vercel.app"]
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_COURSE_ASSETS_BUCKET=course-assets
+SUPABASE_LESSON_FILES_BUCKET=lesson-files
+SUPABASE_VERIFICATION_FILES_BUCKET=verification-files
 ```
 
-Sau khi service co bien moi truong, chay migration cho database production bang shell cua Render/Railway:
+Lưu ý quan trọng:
 
-```bash
-alembic upgrade head
-```
+- `SUPABASE_SERVICE_ROLE_KEY` là khóa bí mật, không commit lên GitHub.
+- Nếu thiếu cấu hình Supabase, các chức năng upload sẽ báo lỗi.
+- `course-assets` và `lesson-files` nên cho phép đọc public nếu muốn frontend hiển thị trực tiếp file đã upload.
 
-## Deploy backend tren Railway
+## 8. Một Số Chức Năng Chính
 
-Tao service tu GitHub repo:
+### Học viên
 
-- Root Directory: `Backend`
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Đăng ký, đăng nhập
+- Xem danh sách khóa học
+- Đăng ký khóa học
+- Xem bài học, cập nhật tiến độ học
+- Làm quiz và final test
+- Nhận chứng chỉ sau khi hoàn thành khóa học
 
-Dat cac bien moi truong tuong tu Render. Railway thuong tien hon neu nhom muon quan ly service va logs nhanh.
+### Giảng viên
 
-## Deploy frontend tren Vercel
+- Gửi hồ sơ xác minh giảng viên
+- Tạo và quản lý khóa học
+- Upload thumbnail, video, tài liệu bài học
+- Tạo bài kiểm tra cuối khóa
+- Chấm bài tự luận trong final test nếu có
+- Theo dõi học viên
 
-Tao project tu GitHub repo:
+### Admin
 
-- Framework Preset: Next.js
-- Root Directory: `Frontend`
-- Install Command: `npm install`
-- Build Command: `npm run build`
+- Quản lý người dùng
+- Duyệt hồ sơ giảng viên
+- Duyệt khóa học
+- Quản lý báo cáo
+- Cấu hình giới hạn upload file
 
-Environment Variables:
+## 9. Các Lệnh Kiểm Tra Nhanh
 
-```env
-NEXT_PUBLIC_API_URL=https://your-backend-domain/api
-```
-
-Sau khi backend co domain that, cap nhat lai:
-
-- `NEXT_PUBLIC_API_URL` tren Vercel
-- `CORS_ORIGINS` tren backend de cho phep domain Vercel
-
-## Ghi chu ve upload file
-
-Hien backend co mount thu muc local `Backend/uploads` tai route `/uploads`. Cach nay dung duoc khi chay local, nhung khong phu hop cho deploy lau dai vi file tren Render/Railway co the mat khi service restart hoac redeploy.
-
-Neu app can upload video, tai lieu, anh khoa hoc hoac minh chung giang vien, nen chuyen sang Supabase Storage:
-
-1. Upload file tu backend len Supabase Storage.
-2. Luu public URL hoac storage path vao database.
-3. Frontend hien thi file bang URL da luu.
-4. Khong commit noi dung trong `Backend/uploads` len GitHub.
-
-## Quy trinh lam viec nhom
-
-Khuyen nghi:
-
-1. Moi thanh vien clone repo tu GitHub.
-2. Moi nguoi tao file `.env` rieng tu `.env.example`.
-3. Lam tinh nang tren branch rieng, vi du `feature/course-review`.
-4. Mo Pull Request vao `main`.
-5. Kiem tra frontend build va backend migration truoc khi merge.
-6. Deploy tu branch `main`.
-
-Lenh kiem tra nhanh truoc khi day code:
+Kiểm tra Frontend build:
 
 ```powershell
 cd Frontend
 npm run build
 ```
 
+Kiểm tra Backend migration:
+
 ```powershell
 cd Backend
 alembic upgrade head
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## API response
+Chạy Backend:
 
-Backend tra response thong nhat:
+```powershell
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+## 10. Lỗi Thường Gặp
+
+### Frontend báo không kết nối được máy chủ
+
+Kiểm tra:
+
+- Backend đã chạy ở `http://127.0.0.1:8000` chưa.
+- File `Frontend/.env.local` có đúng:
+
+```env
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api
+```
+
+### Backend báo lỗi database
+
+Kiểm tra:
+
+- PostgreSQL đã chạy chưa.
+- Database `learnhub` đã được tạo chưa.
+- `DATABASE_URL` trong `Backend/.env` có đúng username, password, host, port, database chưa.
+
+### Alembic không chạy được
+
+Đảm bảo đang đứng trong thư mục `Backend`:
+
+```powershell
+cd Backend
+alembic upgrade head
+```
+
+### Upload file bị lỗi
+
+Kiểm tra:
+
+- Đã tạo bucket Supabase chưa.
+- `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` có đúng không.
+- Tên bucket trong `.env` có khớp không:
+  - `course-assets`
+  - `lesson-files`
+  - `verification-files`
+- File upload có đúng định dạng và dung lượng cho phép không.
+
+### PowerShell không cho activate môi trường ảo
+
+Chạy:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Sau đó chạy lại:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+## 11. Ghi Chú Khi Nộp Hoặc Chia Sẻ Source
+
+Không commit các file/thư mục sau:
+
+- `Backend/.env`
+- `Frontend/.env.local`
+- `Backend/.venv/`
+- `Frontend/node_modules/`
+- `Frontend/.next/`
+- `__pycache__/`
+- File log, cache, file tạm
+
+Chỉ commit các file mẫu:
+
+- `Backend/.env.example`
+- `Frontend/.env.example`
+
+## 12. API Response
+
+Backend trả response thống nhất:
 
 ```json
 {
@@ -282,4 +432,28 @@ Backend tra response thong nhat:
 }
 ```
 
-Khi loi, API tra `success: false` kem `message` va `data` neu co.
+Khi lỗi:
+
+```json
+{
+  "success": false,
+  "message": "Error message",
+  "data": null
+}
+```
+
+## 13. Deploy Tham Khảo
+
+Nếu cần deploy:
+
+- Frontend: Vercel
+- Backend: Render hoặc Railway
+- Database: Supabase PostgreSQL
+- Storage: Supabase Storage
+
+Khi deploy cần cấu hình:
+
+- `NEXT_PUBLIC_API_URL` trên Vercel trỏ tới backend production, ví dụ `https://your-backend.onrender.com/api`
+- `CORS_ORIGINS` trên backend phải chứa domain frontend production
+- `DATABASE_URL`, `SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` phải đặt trong Environment Variables của dịch vụ deploy
+
