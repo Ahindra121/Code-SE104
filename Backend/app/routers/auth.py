@@ -28,18 +28,20 @@ def _deletion_retention_expired(user: User) -> bool:
 def _authenticate_user(db: Session, username: str, password: str) -> User:
     user = db.scalar(select(User).where(or_(User.username == username, User.email == username)))
     if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="TÃªn tÃ i khoáº£n/email hoáº·c máº­t kháº©u khÃ´ng Ä‘Ãºng")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tên tài khoản/email hoặc mật khẩu không đúng",
+        )
     if not user.is_active:
         if user.admin_locked_at:
-            details = ["TÃ i khoáº£n Ä‘Ã£ bá»‹ admin vÃ´ hiá»‡u hÃ³a vÃ  cáº§n Ä‘Æ°á»£c duyá»‡t Ä‘á»ƒ má»Ÿ láº¡i"]
+            details = ["Tài khoản đã bị admin vô hiệu hóa và cần được duyệt để mở lại"]
             if user.admin_locked_reason:
-                details.append(f"LÃ½ do vÃ´ hiá»‡u hÃ³a: {user.admin_locked_reason}")
+                details.append(f"Lý do vô hiệu hóa: {user.admin_locked_reason}")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=". ".join(details))
         if user.deleted_at:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="TÃ i khoáº£n Ä‘ang chá» xÃ³a vÃ  cÃ³ thá»ƒ má»Ÿ láº¡i")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="TÃ i khoáº£n Ä‘Ã£ bá»‹ vÃ´ hiá»‡u hÃ³a vÃ  cÃ³ thá»ƒ má»Ÿ láº¡i")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản đang chờ xóa và có thể mở lại")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản đã bị vô hiệu hóa và có thể mở lại")
     return user
-
 
 @router.post("/register")
 def register(payload: UserCreate, db: Session = Depends(get_db)):
