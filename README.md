@@ -444,16 +444,71 @@ Khi lỗi:
 
 ## 13. Deploy Tham Khảo
 
-Nếu cần deploy:
+Dự án đang dùng:
 
 - Frontend: Vercel
-- Backend: Render hoặc Railway
+- Backend: Railway
 - Database: Supabase PostgreSQL
 - Storage: Supabase Storage
 
-Khi deploy cần cấu hình:
+### Deploy Backend Lên Railway
 
-- `NEXT_PUBLIC_API_URL` trên Vercel trỏ tới backend production, ví dụ `https://your-backend.onrender.com/api`
-- `CORS_ORIGINS` trên backend phải chứa domain frontend production
-- `DATABASE_URL`, `SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` phải đặt trong Environment Variables của dịch vụ deploy
+Tạo service mới trên Railway từ GitHub repository, sau đó cấu hình:
 
+- Root Directory: `Backend`
+- Build Command: để trống hoặc dùng mặc định của Railway
+- Start Command:
+
+```bash
+python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Trong tab **Variables** của Railway, thêm các biến môi trường:
+
+```env
+DATABASE_URL=postgresql+psycopg2://username:password@host:port/database
+SECRET_KEY=change-this-secret-key-before-deploy
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+CORS_ORIGINS=["https://your-frontend.vercel.app","http://localhost:3000"]
+
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_COURSE_ASSETS_BUCKET=course-assets
+SUPABASE_LESSON_FILES_BUCKET=lesson-files
+SUPABASE_VERIFICATION_FILES_BUCKET=verification-files
+```
+
+Lưu ý:
+
+- Railway tự cấp biến `$PORT`, không đặt cứng port `8000` khi deploy.
+- Nếu dùng PostgreSQL của Railway, lấy `DATABASE_URL` trong service database của Railway.
+- Nếu dùng Supabase PostgreSQL, dùng connection string của Supabase và giữ tiền tố `postgresql+psycopg2://`.
+- `CORS_ORIGINS` phải chứa đúng domain frontend production trên Vercel.
+- `SUPABASE_SERVICE_ROLE_KEY` là khóa bí mật, chỉ đặt trong Railway Variables, không commit lên GitHub.
+
+Sau khi deploy backend thành công, kiểm tra:
+
+```text
+https://your-backend.up.railway.app/
+https://your-backend.up.railway.app/docs
+```
+
+### Deploy Frontend Lên Vercel
+
+Trong Vercel, cấu hình biến môi trường:
+
+```env
+NEXT_PUBLIC_API_URL=https://your-backend.up.railway.app/api
+```
+
+Sau khi đổi URL backend hoặc CORS, cần redeploy lại frontend/backend tương ứng.
+
+### Chạy Migration Trên Production
+
+Sau khi backend Railway đã có `DATABASE_URL`, chạy migration trong Railway shell hoặc local với cùng database production:
+
+```bash
+cd Backend
+alembic upgrade head
+```
